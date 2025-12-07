@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0"
+    />
+    <title>《怪奇物语》性格测试</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app-root">
+      <main class="app-main">
+        <!-- 开始页面 -->
+        <section class="card card-intro" id="intro-section">
+          <div class="card-header intro-header">
+            <div class="intro-title-wrapper">
+              <h2 class="intro-main-title">《怪奇物语》性格测试</h2>
+              <p class="intro-subtitle">
+                探索霍金斯小镇的秘密，寻找你的灵魂角色
+              </p>
+            </div>
+          </div>
+
+          <!-- 邀请码输入区域 -->
+          <div class="invite-code-section intro-section-block" id="invite-code-section">
+            <div class="invite-code-content">
+              <h3 class="invite-code-title">输入打开异世界的钥匙</h3>
+              <div class="invite-code-input-wrapper">
+                <input 
+                  type="text" 
+                  id="invite-code-input" 
+                  class="invite-code-input" 
+                  placeholder="输入6位邀请码"
+                  maxlength="6"
+                  autocomplete="off"
+                />
+                <button class="btn primary" id="invite-code-submit">开始测试</button>
+              </div>
+              <div class="invite-code-error" id="invite-code-error"></div>
+              <div class="invite-code-success" id="invite-code-success" style="display: none;">
+                ✓ 邀请码验证成功
+              </div>
+            </div>
+          </div>
+
+          <div class="intro-content">
+            <div class="intro-section-block">
+              <div class="intro-icon">📋</div>
+              <div class="intro-text">
+                <h3>测试说明</h3>
+                <p>
+                  本测试基于《怪奇物语》剧中人物性格设计，通过 <strong>60 道情景选择题</strong>
+                  评估你的行为模式、思维方式、情感反应和价值取向。
+                </p>
+                <p>
+                  请选择最符合你<strong>真实反应</strong>的选项，而非你认为"应该"选择的选项。
+                </p>
+              </div>
+            </div>
+
+            <div class="intro-section-block">
+              <div class="intro-icon">🎯</div>
+              <div class="intro-dimensions">
+                <h4>评估维度</h4>
+                <div class="dimensions-grid">
+                  <div class="dimension-item">
+                    <span class="dimension-label">行动力</span>
+                    <span class="dimension-desc">面对危机时的决策速度与执行力</span>
+                  </div>
+                  <div class="dimension-item">
+                    <span class="dimension-label">合作性</span>
+                    <span class="dimension-desc">团队协作与沟通能力</span>
+                  </div>
+                  <div class="dimension-item">
+                    <span class="dimension-label">守护欲</span>
+                    <span class="dimension-desc">对重要之人的保护意识</span>
+                  </div>
+                  <div class="dimension-item">
+                    <span class="dimension-label">成就欲</span>
+                    <span class="dimension-desc">追求目标与自我实现的动力</span>
+                  </div>
+                  <div class="dimension-item">
+                    <span class="dimension-label">稳定性</span>
+                    <span class="dimension-desc">情绪调节与压力应对能力</span>
+                  </div>
+                  <div class="dimension-item">
+                    <span class="dimension-label">共情力</span>
+                    <span class="dimension-desc">理解他人情绪与感受的能力</span>
+                  </div>
+                  <div class="dimension-item">
+                    <span class="dimension-label">逻辑性</span>
+                    <span class="dimension-desc">理性分析与策略规划能力</span>
+                  </div>
+                  <div class="dimension-item">
+                    <span class="dimension-label">直觉性</span>
+                    <span class="dimension-desc">凭借第六感做出快速判断的能力</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="intro-section-block">
+              <div class="intro-icon">ℹ️</div>
+              <div class="intro-tips">
+                <div class="tip-item">
+                  <span class="tip-label">预计用时</span>
+                  <span class="tip-value">约 15–20 分钟</span>
+                </div>
+                <div class="tip-item">
+                  <span class="tip-label">题目类型</span>
+                  <span class="tip-value">60道选择题（含5道反向验证题）</span>
+                </div>
+                <div class="tip-item">
+                  <span class="tip-label">结果展示</span>
+                  <span class="tip-value">角色匹配概率 + 八维雷达图 + 性格解析</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-footer intro-footer">
+          </div>
+        </section>
+
+        <!-- 进度条 -->
+        <section class="progress-bar-wrapper hidden" id="progress-section">
+          <div class="progress-meta">
+            <span id="progress-text">第 1 / 60 题</span>
+            <span id="progress-percent">0%</span>
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill" id="progress-fill"></div>
+          </div>
+        </section>
+
+        <!-- 答题卡 -->
+        <section class="answer-card-wrapper hidden" id="answer-card-section">
+          <button class="answer-card-toggle" id="answer-card-toggle">
+            <span class="toggle-text">答题卡</span>
+            <span class="toggle-icon" id="toggle-icon">▼</span>
+          </button>
+          <div class="answer-card-content hidden" id="answer-card-content">
+            <div class="answer-card-grid" id="answer-card-grid">
+              <!-- 答题卡项目由 JS 渲染 -->
+            </div>
+          </div>
+        </section>
+
+        <!-- 题目区域 -->
+        <section class="card hidden" id="question-section">
+          <div class="card-header">
+            <h2 id="question-title">题目加载中...</h2>
+            <p class="question-desc" id="question-desc">
+              请根据第一直觉选择最符合你的一项，没有"对"或"错"。
+            </p>
+          </div>
+
+          <div class="options-list" id="options-list">
+            <!-- 选项由 JS 渲染 -->
+          </div>
+
+          <div class="card-footer">
+            <button class="btn ghost" id="btn-prev" disabled>上一题</button>
+            <button class="btn primary" id="btn-next">下一题</button>
+          </div>
+        </section>
+
+        <!-- 结果区域 -->
+        <section class="card card-result hidden" id="result-section">
+          <div class="card-header">
+            <h2 class="result-title">测试完成</h2>
+            <div class="result-analysis" id="result-analysis">
+              <!-- 文字分析由 JS 生成 -->
+            </div>
+          </div>
+
+          <div class="result-summary">
+            <div class="result-combined">
+              <div class="result-main">
+                <div class="character-image-wrapper" id="core-character-image">
+                  <img class="character-image" id="core-character-img" src="" alt="角色图片">
+                </div>
+                <p class="result-label">核心匹配角色</p>
+                <p class="result-type" id="result-type">加载中...</p>
+              </div>
+              <div class="result-radar-wrapper">
+                <div class="result-chart" id="dimension-chart">
+                  <h3 class="chart-title">各项性格维度分值</h3>
+                  <!-- 维度进度条由 JS 生成 -->
+                </div>
+              </div>
+            </div>
+
+            <div class="result-secondary">
+              <h3 class="secondary-title">次要匹配角色</h3>
+              <div class="secondary-list" id="secondary-list">
+                <!-- 次要角色由 JS 生成 -->
+              </div>
+            </div>
+
+            <div class="result-report" id="result-report">
+              <!-- 性格解析由 JS 生成 -->
+            </div>
+          </div>
+
+          <div class="card-footer result-footer">
+            <button class="btn ghost" id="btn-restart">重新测试</button>
+          </div>
+        </section>
+      </main>
+
+      <footer class="app-footer">
+        <span>仅供娱乐参考，不代表心理诊断或专业人格评估</span>
+      </footer>
+    </div>
+
+    <script src="js/config.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/device.js"></script>
+    <script src="js/invite-code.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>

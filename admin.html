@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理员后台 - 怪奇物语性格测试</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <div class="app-root">
+        <!-- 登录界面 -->
+        <div id="loginSection" class="login-section">
+            <section class="card card-login">
+                <div class="card-header">
+                    <h2 class="intro-main-title">管理员登录</h2>
+                </div>
+                <div class="login-card-content">
+                <input 
+                    type="password" 
+                    id="passwordInput" 
+                    class="input-field"
+                    placeholder="请输入管理员密码"
+                    autocomplete="off"
+                >
+                <button id="loginBtn" class="neon-button">登录</button>
+                    <div id="loginError" class="error-msg"></div>
+                    <div class="back-link">
+                        <a href="index.html">← 返回首页</a>
+                    </div>
+                </div>
+            </section>
+        </div>
+        
+        <!-- 管理界面 -->
+        <div id="adminSection" class="admin-section" style="display: none;">
+            <section class="card">
+                <div class="card-header">
+                    <div class="header-content">
+                        <h2 class="intro-main-title">邀请码管理系统</h2>
+                        <div class="header-actions">
+                            <button id="settingsBtn" class="btn secondary">设置</button>
+                            <button id="logoutBtn" class="btn secondary">退出登录</button>
+                        </div>
+                    </div>
+                </div>
+            
+                <!-- 统计信息 -->
+                <div class="stats-panel">
+                    <div class="stat-item">
+                        <span class="stat-label">总邀请码数</span>
+                        <span class="stat-value" id="totalCodes">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">已使用次数</span>
+                        <span class="stat-value" id="usedCount">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">剩余次数</span>
+                        <span class="stat-value" id="remainingCount">0</span>
+                    </div>
+                </div>
+            </section>
+            
+            <main class="admin-main">
+            
+                <!-- 操作面板 -->
+                <section class="card">
+                    <div class="card-header">
+                        <h3 class="section-title">生成邀请码</h3>
+                    </div>
+                    <div class="card-content">
+                        <div class="generate-actions">
+                            <button id="generateBtn" class="btn primary">生成单个</button>
+                            <div class="batch-generate">
+                                <input 
+                                    type="number" 
+                                    id="batchCount" 
+                                    class="input-field-small"
+                                    placeholder="数量"
+                                    min="1"
+                                    max="2000"
+                                    value="10"
+                                >
+                                <button id="batchGenerateBtn" class="btn primary">批量生成</button>
+                            </div>
+                        </div>
+                        <div id="newCode" class="new-code"></div>
+                    </div>
+                </section>
+                
+                <section class="card">
+                    <div class="card-content">
+                        <div class="codes-actions-panel">
+                            <button id="copyAllBtn" class="btn secondary">复制所有邀请码</button>
+                            <button id="copyUnusedBtn" class="btn secondary">复制未使用邀请码</button>
+                        </div>
+                    </div>
+                </section>
+                
+            
+                <!-- 邀请码列表 -->
+                <section class="card">
+                    <div class="card-header">
+                        <div class="codes-panel-header">
+                            <h3 class="section-title">邀请码列表</h3>
+                            <div class="filter-buttons">
+                                <button class="filter-btn active" data-filter="all">全部</button>
+                                <button class="filter-btn" data-filter="unused">未使用</button>
+                                <button class="filter-btn" data-filter="partial">使用中</button>
+                                <button class="filter-btn" data-filter="used">已用完</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-content">
+                        <div class="codes-list" id="codesList">
+                            <!-- 动态生成 -->
+                        </div>
+                        <div class="pagination" id="pagination" style="display: none;">
+                            <button class="pagination-btn" id="prevPageBtn">上一页</button>
+                            <span class="pagination-info" id="paginationInfo">第 1 页 / 共 1 页</span>
+                            <button class="pagination-btn" id="nextPageBtn">下一页</button>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+        
+        <!-- 设置弹窗 -->
+        <div id="settingsModal" class="modal-overlay" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title">修改管理员密码</h3>
+                    <button id="closeSettingsBtn" class="modal-close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="password-form">
+                        <input 
+                            type="password" 
+                            id="newPasswordInput" 
+                            class="input-field"
+                            placeholder="输入新密码"
+                            autocomplete="off"
+                        >
+                        <input 
+                            type="password" 
+                            id="confirmPasswordInput" 
+                            class="input-field"
+                            placeholder="确认新密码"
+                            autocomplete="off"
+                        >
+                        <button id="changePasswordBtn" class="btn primary">修改密码</button>
+                    </div>
+                    <div id="passwordError" class="error-msg"></div>
+                    <div id="passwordSuccess" class="success-msg"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/config.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/admin.js"></script>
+    <script>
+        // 确保密码输入框和登录按钮始终可用
+        document.addEventListener('DOMContentLoaded', function() {
+            // 确保密码输入框可用
+            const passwordInput = document.getElementById('passwordInput');
+            if (passwordInput) {
+                passwordInput.removeAttribute('readonly');
+                passwordInput.removeAttribute('disabled');
+                passwordInput.style.cssText += 'pointer-events: auto !important; cursor: text !important; z-index: 99999 !important; position: relative !important; opacity: 1 !important;';
+                passwordInput.addEventListener('click', function() {
+                    this.focus();
+                });
+                console.log('密码输入框已初始化，可以使用');
+            }
+            
+            // 确保登录按钮可点击
+            const loginBtn = document.getElementById('loginBtn');
+            if (loginBtn) {
+                loginBtn.removeAttribute('disabled');
+                loginBtn.style.cssText += 'pointer-events: auto !important; cursor: pointer !important; z-index: 99999 !important; position: relative !important; opacity: 1 !important;';
+                console.log('登录按钮已初始化，可以点击');
+            } else {
+                console.error('未找到登录按钮元素');
+            }
+            
+            // 确保密码修改输入框可用
+            const newPasswordInput = document.getElementById('newPasswordInput');
+            if (newPasswordInput) {
+                newPasswordInput.removeAttribute('readonly');
+                newPasswordInput.removeAttribute('disabled');
+                newPasswordInput.style.cssText += 'pointer-events: auto !important; cursor: text !important; z-index: 99999 !important; position: relative !important; opacity: 1 !important;';
+                newPasswordInput.addEventListener('click', function() {
+                    this.focus();
+                });
+                console.log('新密码输入框已初始化，可以使用');
+            }
+            
+            const confirmPasswordInput = document.getElementById('confirmPasswordInput');
+            if (confirmPasswordInput) {
+                confirmPasswordInput.removeAttribute('readonly');
+                confirmPasswordInput.removeAttribute('disabled');
+                confirmPasswordInput.style.cssText += 'pointer-events: auto !important; cursor: text !important; z-index: 99999 !important; position: relative !important; opacity: 1 !important;';
+                confirmPasswordInput.addEventListener('click', function() {
+                    this.focus();
+                });
+                console.log('确认密码输入框已初始化，可以使用');
+            }
+            
+            // 确保设置按钮可点击
+            const settingsBtn = document.getElementById('settingsBtn');
+            if (settingsBtn) {
+                settingsBtn.removeAttribute('disabled');
+                settingsBtn.style.cssText += 'pointer-events: auto !important; cursor: pointer !important; z-index: 99999 !important; position: relative !important; opacity: 1 !important;';
+                console.log('设置按钮已初始化，可以点击');
+            }
+            
+            // 确保修改密码按钮可点击
+            const changePasswordBtn = document.getElementById('changePasswordBtn');
+            if (changePasswordBtn) {
+                changePasswordBtn.removeAttribute('disabled');
+                changePasswordBtn.style.cssText += 'pointer-events: auto !important; cursor: pointer !important; z-index: 99999 !important; position: relative !important; opacity: 1 !important;';
+                console.log('修改密码按钮已初始化，可以点击');
+            }
+        });
+    </script>
+</body>
+</html>

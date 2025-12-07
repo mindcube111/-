@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试结果 - 怪奇物语性格测试</title>
+    <link rel="stylesheet" href="css/common.css">
+    <link rel="stylesheet" href="css/result.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1 class="main-title">测试结果</h1>
+        
+        <!-- 结果内容区域 -->
+        <div class="result-content" id="resultContent">
+            <!-- 核心匹配角色 -->
+            <div class="core-character">
+                <h2 class="section-title">核心匹配角色</h2>
+                <div class="character-card">
+                    <h3 id="coreName" class="character-name"></h3>
+                    <div class="probability-bar">
+                        <div class="probability-fill" id="coreProbability"></div>
+                    </div>
+                    <p class="probability-text" id="coreProbabilityText"></p>
+                </div>
+            </div>
+            
+            <!-- 次要匹配角色 -->
+            <div class="secondary-characters">
+                <h2 class="section-title">次要匹配角色</h2>
+                <div class="character-list" id="secondaryList">
+                    <!-- 动态生成 -->
+                </div>
+            </div>
+            
+            <!-- 性格维度雷达图 -->
+            <div class="radar-section">
+                <h2 class="section-title">性格维度分析</h2>
+                <div class="radar-container">
+                    <canvas id="radarChart"></canvas>
+                </div>
+            </div>
+            
+            <!-- 核心标签 -->
+            <div class="tags-section">
+                <h2 class="section-title">核心标签</h2>
+                <div class="tags-list" id="tagsList">
+                    <!-- 动态生成 -->
+                </div>
+            </div>
+            
+            <!-- 性格解析 -->
+            <div class="analysis-section">
+                <h2 class="section-title">性格解析</h2>
+                <div class="analysis-content" id="analysisContent">
+                    <!-- 动态生成 -->
+                </div>
+            </div>
+            
+            <!-- 生活应用建议 -->
+            <div class="suggestions-section">
+                <h2 class="section-title">生活应用建议</h2>
+                <div class="suggestions-content" id="suggestionsContent">
+                    <!-- 动态生成 -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- 操作按钮 -->
+        <div class="actions">
+            <button id="saveBtn" class="neon-button">保存结果</button>
+            <button id="retestBtn" class="neon-button-outline">重新测试</button>
+        </div>
+    </div>
+    
+    <script src="js/config.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/device.js"></script>
+    <script src="js/scoring.js"></script>
+    <script src="js/character-data.js"></script>
+    <script src="js/result.js"></script>
+</body>
+</html>
+

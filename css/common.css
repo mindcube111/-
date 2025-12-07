@@ -1,0 +1,303 @@
+/* 怪奇物语主题 - 公共样式 */
+
+/* 引入Stranger Things字体（使用Google Fonts替代） */
+@import url('https://fonts.googleapis.com/css2?family=Creepster&display=swap');
+
+/* 重置样式 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* 根变量 */
+:root {
+    --bg-dark: #0a0a0a;
+    --bg-secondary: #1a1a1a;
+    --text-light: #e0e0e0;
+    --text-gray: #999;
+    --neon-red: #ff0000;
+    --neon-red-light: #ff6b6b;
+    --border-dark: #333;
+    --border-light: #555;
+}
+
+/* 全局样式 */
+body {
+    font-family: 'Courier New', monospace;
+    background-color: var(--bg-dark);
+    color: var(--text-light);
+    min-height: 100vh;
+    background-image: 
+        repeating-linear-gradient(
+            0deg,
+            transparent,
+            transparent 2px,
+            rgba(255, 0, 0, 0.03) 2px,
+            rgba(255, 0, 0, 0.03) 4px
+        );
+    overflow-x: hidden;
+}
+
+/* 容器 */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 40px 20px;
+}
+
+/* 主标题 - Stranger Things风格 */
+.main-title {
+    font-family: 'Creepster', cursive;
+    font-size: 4rem;
+    text-align: center;
+    color: var(--neon-red);
+    text-shadow: 
+        0 0 10px var(--neon-red),
+        0 0 20px var(--neon-red),
+        0 0 30px var(--neon-red),
+        0 0 40px var(--neon-red);
+    letter-spacing: 8px;
+    margin-bottom: 20px;
+    animation: flicker 3s infinite alternate;
+}
+
+/* 副标题 */
+.sub-title {
+    font-family: 'Arial', sans-serif;
+    font-size: 1.5rem;
+    text-align: center;
+    color: var(--text-light);
+    margin-bottom: 40px;
+    letter-spacing: 4px;
+}
+
+/* 霓虹按钮 */
+.neon-button {
+    background-color: transparent;
+    border: 3px solid var(--neon-red);
+    color: var(--neon-red);
+    padding: 15px 40px;
+    font-size: 1.2rem;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    transition: all 0.3s ease;
+    box-shadow: 
+        0 0 10px var(--neon-red),
+        inset 0 0 10px transparent;
+    position: relative;
+    overflow: hidden;
+}
+
+.neon-button:hover {
+    background-color: var(--neon-red);
+    color: var(--bg-dark);
+    box-shadow: 
+        0 0 20px var(--neon-red),
+        0 0 30px var(--neon-red),
+        inset 0 0 20px var(--neon-red);
+    transform: translateY(-2px);
+}
+
+.neon-button:active {
+    transform: translateY(0);
+}
+
+.neon-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* 外边框按钮 */
+.neon-button-outline {
+    background-color: transparent;
+    border: 2px solid var(--border-light);
+    color: var(--text-light);
+    padding: 12px 30px;
+    font-size: 1rem;
+    font-family: 'Courier New', monospace;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    transition: all 0.3s ease;
+}
+
+.neon-button-outline:hover {
+    border-color: var(--neon-red);
+    color: var(--neon-red);
+    box-shadow: 0 0 10px var(--neon-red);
+}
+
+/* 卡片样式 */
+.card {
+    background-color: var(--bg-secondary);
+    border: 3px solid var(--border-dark);
+    padding: 30px;
+    margin: 20px 0;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    position: relative;
+}
+
+/* 输入框 */
+input[type="text"],
+input[type="password"] {
+    width: 100%;
+    padding: 15px;
+    font-size: 1.2rem;
+    font-family: 'Courier New', monospace;
+    background-color: var(--bg-dark);
+    border: 2px solid var(--border-dark);
+    color: var(--text-light);
+    outline: none;
+    transition: all 0.3s ease;
+    letter-spacing: 4px;
+    text-align: center;
+    text-transform: uppercase;
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus {
+    border-color: var(--neon-red);
+    box-shadow: 0 0 10px var(--neon-red);
+}
+
+input[type="text"]::placeholder,
+input[type="password"]::placeholder {
+    color: var(--text-gray);
+    letter-spacing: 2px;
+}
+
+/* 错误消息 */
+.error-msg {
+    color: var(--neon-red);
+    text-align: center;
+    margin-top: 15px;
+    font-size: 0.9rem;
+    min-height: 20px;
+    animation: shake 0.5s;
+}
+
+/* 链接样式 */
+a {
+    color: var(--text-light);
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+a:hover {
+    color: var(--neon-red);
+    text-shadow: 0 0 10px var(--neon-red);
+}
+
+/* 动画 - 霓虹闪烁 */
+@keyframes flicker {
+    0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% {
+        text-shadow: 
+            0 0 10px var(--neon-red),
+            0 0 20px var(--neon-red),
+            0 0 30px var(--neon-red),
+            0 0 40px var(--neon-red);
+    }
+    20%, 24%, 55% {
+        text-shadow: none;
+    }
+}
+
+/* 动画 - 抖动 */
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+    20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+
+/* 动画 - 淡入 */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 动画 - 光晕脉冲 */
+@keyframes glow-pulse {
+    0%, 100% {
+        box-shadow: 0 0 10px var(--neon-red);
+    }
+    50% {
+        box-shadow: 0 0 20px var(--neon-red), 0 0 30px var(--neon-red);
+    }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .main-title {
+        font-size: 2.5rem;
+        letter-spacing: 4px;
+    }
+    
+    .sub-title {
+        font-size: 1.2rem;
+        letter-spacing: 2px;
+    }
+    
+    .container {
+        padding: 20px 15px;
+    }
+    
+    .neon-button {
+        padding: 12px 30px;
+        font-size: 1rem;
+    }
+    
+    input[type="text"],
+    input[type="password"] {
+        font-size: 1rem;
+        padding: 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    .main-title {
+        font-size: 2rem;
+        letter-spacing: 2px;
+    }
+    
+    .sub-title {
+        font-size: 1rem;
+    }
+    
+    .neon-button {
+        padding: 10px 20px;
+        font-size: 0.9rem;
+    }
+}
+
+/* 浏览器兼容性 */
+input[type="text"],
+input[type="password"],
+button {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+}
+
+/* 移动端触摸优化 */
+@media (hover: none) {
+    .neon-button:hover,
+    .option:hover {
+        transform: none;
+    }
+    
+    .neon-button:active,
+    .option:active {
+        opacity: 0.8;
+    }
+}
+

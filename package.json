@@ -1,0 +1,21 @@
+{
+  "name": "stranger-things-test",
+  "version": "1.0.0",
+  "description": "《怪奇物语》性格测试网站",
+  "scripts": {
+    "deploy": "wrangler pages deploy . --project-name=stranger-things-test",
+    "deploy:preview": "wrangler pages deploy . --project-name=stranger-things-test --branch=preview",
+    "kv:list": "wrangler kv:namespace list",
+    "kv:put": "wrangler kv:bulk put --namespace-id",
+    "generate-invites": "node tools/generate-bulk.js",
+    "login": "wrangler login",
+    "whoami": "wrangler whoami"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
+
