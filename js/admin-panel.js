@@ -143,6 +143,17 @@ document.addEventListener('DOMContentLoaded', function() {
             adminLogoutBtnHeader.addEventListener('click', handleLogout);
         }
 
+        // 监听邀请码使用更新事件
+        document.addEventListener('inviteCodeUsageUpdated', function(e) {
+            // 如果管理员面板已打开，自动刷新数据
+            if (isLoggedIn && adminFunctions && adminFunctions.classList.contains('show')) {
+                console.log('收到邀请码使用更新通知，刷新管理员面板');
+                loadInviteCodes();
+                updateStats();
+                renderCodesList();
+            }
+        });
+
     }
 
     function toggleAdminPanel() {
@@ -233,14 +244,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function showAdminFunctions() {
-        if (adminLoginSection) adminLoginSection.style.display = 'block';
-        const form = adminLoginSection ? adminLoginSection.querySelector('form') : null;
-        if (form) {
-            const inputs = form.querySelectorAll('input');
-            inputs.forEach(input => input.style.display = 'none');
-            const loginBtn = form.querySelector('button[type="submit"]');
-            if (loginBtn) loginBtn.style.display = 'none';
-        }
+        if (adminLoginSection) adminLoginSection.style.display = 'none';
         if (adminFunctions) adminFunctions.classList.add('show');
         if (adminLogoutBtnHeader) adminLogoutBtnHeader.style.display = 'block';
         loadInviteCodes();
@@ -879,7 +883,14 @@ document.addEventListener('DOMContentLoaded', function() {
     window.adminPanel = {
         toggle: toggleAdminPanel,
         close: closeAdminPanel,
-        generate: generateInviteCodes
+        generate: generateInviteCodes,
+        refresh: function() {
+            if (isLoggedIn && adminFunctions && adminFunctions.classList.contains('show')) {
+                loadInviteCodes();
+                updateStats();
+                renderCodesList();
+            }
+        }
     };
 });
 

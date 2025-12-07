@@ -1612,6 +1612,9 @@ function renderResult() {
     answerCardSectionEl.classList.add('hidden');
     resultSectionEl.classList.remove('hidden');
     
+    // 测试完成，更新邀请码使用记录并同步到管理员系统
+    updateInviteCodeUsage();
+    
     // 绘制雷达图
     setTimeout(() => {
       drawRadarChart(result.coreCharacter.id);
@@ -1620,6 +1623,109 @@ function renderResult() {
   } catch (error) {
     console.error('渲染结果时出错:', error);
     alert('显示结果时出现错误，请刷新页面重试。');
+  }
+}
+
+// ==================== 更新邀请码使用记录 ====================
+async function updateInviteCodeUsage() {
+  try {
+    // 获取当前使用的邀请码
+    const currentCode = Storage.getCurrentInviteCode();
+    if (!currentCode) {
+      console.log('未找到当前邀请码，跳过更新');
+      return;
+    }
+
+    const inviteCodes = Storage.getInviteCodes() || [];
+    const deviceId = DeviceManager.getDeviceId();
+    const invite = inviteCodes.find(item => item && item.code === currentCode);
+    
+    if (!invite) {
+      console.log('邀请码记录不存在，跳过更新');
+      return;
+    }
+
+    // 更新最后使用时间
+    const now = new Date().toISOString();
+    invite.lastUsedAt = now;
+    
+    // 确保使用记录数组存在
+    if (!invite.usageHistory) {
+      invite.usageHistory = [];
+    }
+    
+    // 检查是否已有本次测试的使用记录（避免重复添加）
+    const today = new Date().toISOString().split('T')[0];
+    const hasTodayRecord = invite.usageHistory.some(record => {
+      const recordDate = new Date(record.usedAt).toISOString().split('T')[0];
+      return recordDate === today && record.testCompleted === true;
+    });
+    
+    // 如果没有今天的测试完成记录，添加一条
+    if (!hasTodayRecord) {
+      invite.usageHistory.push({
+        deviceId: deviceId,
+        usedAt: now,
+        userAgent: navigator.userAgent || 'unknown',
+        ip: 'unknown',
+        testCompleted: true // 标记为测试完成
+      });
+    }
+    
+    // 保存到本地存储
+    Storage.setInviteCodes(inviteCodes);
+    
+    // 同步到后端API（如果使用API验证）
+    try {
+      const response = await fetch('/api/update-invite-usage', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          code: currentCode,
+          usedCount: invite.usedCount,
+          lastUsedAt: now,
+          deviceId: deviceId
+        })
+      });
+      
+      if (response.ok) {
+        console.log('邀请码使用记录已同步到服务器');
+      }
+    } catch (apiError) {
+      console.log('同步到服务器失败（可能未配置API）:', apiError);
+      // API同步失败不影响本地使用
+    }
+    
+    // 触发管理员面板数据刷新（如果打开的话）
+    if (typeof window.adminPanel !== 'undefined' && window.adminPanel.refresh) {
+      try {
+        window.adminPanel.refresh();
+      } catch (e) {
+        console.log('刷新管理员面板失败:', e);
+      }
+    }
+    
+    // 发送自定义事件，通知管理员面板刷新
+    const refreshEvent = new CustomEvent('inviteCodeUsageUpdated', {
+      detail: {
+        code: currentCode,
+        usedCount: invite.usedCount,
+        lastUsedAt: now
+      }
+    });
+    document.dispatchEvent(refreshEvent);
+    
+    console.log('邀请码使用记录已更新:', {
+      code: currentCode,
+      usedCount: invite.usedCount,
+      lastUsedAt: now
+    });
+    
+  } catch (error) {
+    console.error('更新邀请码使用记录时出错:', error);
+    // 错误不影响结果展示
   }
 }
 
