@@ -179,7 +179,7 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             // 🔧 修复：优先使用本地验证（刚生成的邀请码在本地存储中）
             console.log('开始验证邀请码:', code);
-            const localResult = validateInviteCode(code);
+            const localResult = await validateInviteCode(code);
             
             if (localResult.success) {
                 // 本地验证成功，直接使用
@@ -326,9 +326,9 @@ document.addEventListener('DOMContentLoaded', function() {
     /**
      * 验证邀请码（本地验证，用于开发环境或 API 失败时的回退）
      * @param {string} code
-     * @returns {Object}
+     * @returns {Promise<Object>}
      */
-    function validateInviteCode(code) {
+    async function validateInviteCode(code) {
         try {
             // 确保 Storage 对象已加载
             if (typeof Storage === 'undefined') {
@@ -406,7 +406,7 @@ document.addEventListener('DOMContentLoaded', function() {
             invite.usedCount = currentUsedCount + 1;
             invite.lastUsedAt = new Date().toISOString();
 
-            // 保存更新
+            // 保存更新到本地
             const saved = Storage.setInviteCodes(inviteCodes);
             if (!saved) {
                 console.error('保存邀请码失败');
@@ -414,6 +414,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     success: false,
                     message: '保存邀请码信息失败，请重试'
                 };
+            }
+            
+            // 同步到云端（异步，不阻塞）
+            if (typeof SyncStorage !== 'undefined') {
+                try {
+                    await SyncStorage.set(CONFIG.STORAGE_KEYS.INVITE_CODES, inviteCodes);
+                    if (typeof Logger !== 'undefined') Logger.log('邀请码使用情况已同步到云端');
+                } catch (error) {
+                    console.error('同步到云端失败:', error);
+                    // 同步失败不影响本地使用
+                }
             }
 
             if (typeof Logger !== 'undefined') Logger.log('邀请码验证成功，当前使用次数:', invite.usedCount);

@@ -59,6 +59,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 初始化
     init();
+    
+    // 定期从云端同步数据（每10秒）
+    let syncInterval = null;
 
     function init() {
         // 确保密码输入框可编辑
@@ -226,6 +229,8 @@ document.addEventListener('DOMContentLoaded', function() {
     // 退出登录
     if (logoutBtn) {
         logoutBtn.addEventListener('click', function() {
+            // 停止云端同步
+            stopCloudSync();
             sessionStorage.removeItem('admin_logged_in');
             showLoginSection();
         });
@@ -614,7 +619,7 @@ document.addEventListener('DOMContentLoaded', function() {
     /**
      * 生成单个邀请码
      */
-    function generateSingleCode() {
+    async function generateSingleCode() {
         try {
             if (!Storage || !CONFIG) {
                 alert('系统初始化失败，请刷新页面重试');
@@ -649,12 +654,15 @@ document.addEventListener('DOMContentLoaded', function() {
             
             inviteCodes.push(newInvite);
             
-            // 保存
+            // 保存到本地
             const saved = Storage.setInviteCodes(inviteCodes);
             if (!saved) {
                 alert('保存邀请码失败，请检查浏览器存储空间');
                 return;
             }
+            
+            // 同步到云端
+            await syncToCloud();
             
             // 显示新邀请码
             showNewCode(code);
@@ -1011,10 +1019,105 @@ document.addEventListener('DOMContentLoaded', function() {
         // 确保密码修改输入框可用
         initPasswordChangeInputs();
         
+        // 启动云端同步
+        startCloudSync();
+        
         renderCodesList();
         updateStats();
         if (newCodeDisplay) {
             newCodeDisplay.textContent = '';
+        }
+    }
+    
+    /**
+     * 启动云端数据同步
+     */
+    async function startCloudSync() {
+        // 清除旧的定时器
+        if (syncInterval) {
+            clearInterval(syncInterval);
+        }
+        
+        // 立即同步一次
+        await syncFromCloud();
+        
+        // 每10秒自动同步
+        syncInterval = setInterval(async () => {
+            await syncFromCloud();
+        }, 10000);
+        
+        if (typeof Logger !== 'undefined') {
+            Logger.log('云端同步已启动，每10秒自动同步');
+        }
+    }
+    
+    /**
+     * 停止云端同步
+     */
+    function stopCloudSync() {
+        if (syncInterval) {
+            clearInterval(syncInterval);
+            syncInterval = null;
+            if (typeof Logger !== 'undefined') {
+                Logger.log('云端同步已停止');
+            }
+        }
+    }
+    
+    /**
+     * 从云端同步邀请码数据
+     */
+    async function syncFromCloud() {
+        try {
+            // 检查 SyncStorage 是否可用
+            if (typeof SyncStorage === 'undefined') {
+                console.warn('SyncStorage 未定义，跳过云端同步');
+                return;
+            }
+            
+            // 从云端获取邀请码列表
+            const cloudData = await SyncStorage.get(CONFIG.STORAGE_KEYS.INVITE_CODES, []);
+            
+            if (cloudData && Array.isArray(cloudData)) {
+                // 更新本地存储
+                Storage.setInviteCodes(cloudData);
+                
+                // 刷新界面
+                renderCodesList();
+                updateStats();
+                
+                if (typeof Logger !== 'undefined') {
+                    Logger.log('从云端同步数据成功:', cloudData.length, '个邀请码');
+                }
+            }
+        } catch (error) {
+            console.error('从云端同步数据失败:', error);
+            // 同步失败不影响使用，继续使用本地数据
+        }
+    }
+    
+    /**
+     * 同步数据到云端
+     */
+    async function syncToCloud() {
+        try {
+            // 检查 SyncStorage 是否可用
+            if (typeof SyncStorage === 'undefined') {
+                console.warn('SyncStorage 未定义，跳过云端同步');
+                return false;
+            }
+            
+            const inviteCodes = Storage.getInviteCodes();
+            const success = await SyncStorage.set(CONFIG.STORAGE_KEYS.INVITE_CODES, inviteCodes);
+            
+            if (success && typeof Logger !== 'undefined') {
+                Logger.log('同步数据到云端成功');
+            }
+            
+            return success;
+        } catch (error) {
+            console.error('同步数据到云端失败:', error);
+            return false;
         }
     }
 
@@ -1225,10 +1328,13 @@ document.addEventListener('DOMContentLoaded', function() {
      * 删除邀请码
      * @param {string} code
      */
-    function deleteInviteCode(code) {
+    async function deleteInviteCode(code) {
         let inviteCodes = Storage.getInviteCodes();
         inviteCodes = inviteCodes.filter(item => item.code !== code);
         Storage.setInviteCodes(inviteCodes);
+        
+        // 同步到云端
+        await syncToCloud();
         
         // 检查当前页是否还有内容，如果没有则调整页码
         const filteredCodes = getFilteredCodes();
