@@ -12,11 +12,6 @@
   </head>
   <body>
     <div class="app-root">
-      <!-- 管理员入口按钮（右上角） -->
-      <button id="admin-toggle-btn" class="admin-toggle-btn" title="管理员后台">
-        ⚙️
-      </button>
-      
       <main class="app-main">
         <!-- 开始页面 -->
         <section class="card card-intro" id="intro-section">
@@ -127,6 +122,7 @@
           </div>
 
           <div class="card-footer intro-footer">
+            <button id="admin-toggle-btn" class="admin-login-text-btn">登录页面</button>
           </div>
         </section>
 
@@ -228,10 +224,6 @@
         <div class="admin-panel-header">
           <div class="admin-header-content">
             <h2 class="admin-panel-title">邀请码管理系统</h2>
-            <div class="admin-header-actions">
-              <button class="admin-btn admin-btn-secondary" id="admin-settings-btn">设置</button>
-              <button class="admin-btn admin-btn-secondary" id="admin-logout-btn-header">退出登录</button>
-            </div>
           </div>
           <button class="admin-panel-close" id="admin-panel-close">&times;</button>
         </div>
@@ -240,12 +232,19 @@
           <div id="admin-login-section">
             <form class="admin-login-form" id="admin-login-form">
               <input 
+                type="text" 
+                id="admin-username-input" 
+                placeholder="请输入管理员账号"
+                autocomplete="off"
+              />
+              <input 
                 type="password" 
                 id="admin-password-input" 
                 placeholder="请输入管理员密码"
                 autocomplete="off"
               />
               <button type="submit" class="admin-btn admin-btn-primary">登录</button>
+              <button type="button" class="admin-btn admin-btn-primary" id="admin-logout-btn-header" style="display: none;">退出登录</button>
               <div id="admin-login-message" class="admin-message" style="display: none;"></div>
             </form>
           </div>
@@ -290,10 +289,12 @@
               <div id="admin-generate-message" class="admin-message" style="display: none;"></div>
             </div>
             
-            <!-- 复制操作 -->
+            <!-- 复制和导出操作 -->
             <div class="admin-copy-section">
               <button class="admin-btn admin-btn-secondary" id="admin-copy-all-btn">复制所有邀请码</button>
               <button class="admin-btn admin-btn-secondary" id="admin-copy-unused-btn">复制未使用邀请码</button>
+              <button class="admin-btn admin-btn-secondary" id="admin-export-all-btn">导出所有记录</button>
+              <button class="admin-btn admin-btn-secondary" id="admin-refresh-btn">刷新数据</button>
             </div>
             
             <!-- 邀请码列表 -->

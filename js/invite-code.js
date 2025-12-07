@@ -186,7 +186,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.log('本地验证成功');
                 Storage.setCurrentInviteCode(code);
                 if (errorMsg) errorMsg.textContent = '';
-                if (successMsg) successMsg.style.display = 'block';
+                if (successMsg) {
+                    successMsg.textContent = localResult.message || '邀请码验证成功！';
+                    successMsg.style.display = 'block';
+                }
                 inviteCodeInput.value = '';
                 startTest();
                 return;
@@ -201,7 +204,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.log('API 验证成功');
                 Storage.setCurrentInviteCode(code);
                 if (errorMsg) errorMsg.textContent = '';
-                if (successMsg) successMsg.style.display = 'block';
+                if (successMsg) {
+                    const remaining = apiResult.remaining !== undefined ? apiResult.remaining : (CONFIG.MAX_USE_COUNT - (apiResult.usedCount || 0));
+                    successMsg.textContent = `邀请码验证成功！剩余可用次数：${remaining}次`;
+                    successMsg.style.display = 'block';
+                }
                 inviteCodeInput.value = '';
                 startTest();
             } else {
@@ -264,23 +271,45 @@ document.addEventListener('DOMContentLoaded', function() {
                     const deviceId = DeviceManager.getDeviceId();
                     let invite = inviteCodes.find(item => item && item.code === code);
                     
+                    const now = new Date().toISOString();
                     if (!invite) {
                         // 如果本地存储中没有，创建一个新记录
                         invite = {
                             code: code,
                             deviceId: deviceId,
-                            usedCount: data.usedCount || 0,
+                            usedCount: data.usedCount || 1,
                             createdAt: new Date().toISOString(),
-                            lastUsedAt: new Date().toISOString()
+                            lastUsedAt: now,
+                            boundAt: now,
+                            disabled: false,
+                            usageHistory: [{
+                                deviceId: deviceId,
+                                usedAt: now,
+                                userAgent: navigator.userAgent || 'unknown',
+                                ip: 'unknown'
+                            }]
                         };
                         inviteCodes.push(invite);
                     } else {
                         // 更新现有记录
-                        invite.usedCount = data.usedCount || (invite.usedCount || 0) + 1;
-                        invite.lastUsedAt = new Date().toISOString();
+                        const newUsedCount = data.usedCount || (invite.usedCount || 0) + 1;
+                        invite.usedCount = newUsedCount;
+                        invite.lastUsedAt = now;
                         if (!invite.deviceId) {
                             invite.deviceId = deviceId;
+                            invite.boundAt = now;
                         }
+                        // 初始化使用记录数组
+                        if (!invite.usageHistory) {
+                            invite.usageHistory = [];
+                        }
+                        // 添加使用记录
+                        invite.usageHistory.push({
+                            deviceId: deviceId,
+                            usedAt: now,
+                            userAgent: navigator.userAgent || 'unknown',
+                            ip: 'unknown'
+                        });
                     }
                     
                     Storage.setInviteCodes(inviteCodes);
@@ -306,7 +335,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         message += '。' + data.debug.reason;
                     }
                 } else if (data.message === 'used') {
-                    message = '此邀请码使用次数已达上限（3次）';
+                    message = '邀请码使用次数已用尽，请联系管理员获取新邀请码';
+                } else if (data.message === 'device_mismatch') {
+                    message = '该邀请码已绑定其他设备，请在首次使用的设备上操作';
                 } else if (data.message) {
                     message = data.message;
                 }
@@ -383,11 +414,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
 
+            // 检查是否已禁用
+            if (invite.disabled === true) {
+                return {
+                    success: false,
+                    message: '该邀请码已被管理员禁用'
+                };
+            }
+
             // 检查是否已绑定设备
             if (invite.deviceId && invite.deviceId !== deviceId) {
                 return {
                     success: false,
-                    message: '此邀请码已在其他设备使用'
+                    message: '该邀请码已绑定其他设备，请在首次使用的设备上操作'
                 };
             }
 
@@ -395,16 +434,33 @@ document.addEventListener('DOMContentLoaded', function() {
             if (currentUsedCount >= CONFIG.MAX_USE_COUNT) {
                 return {
                     success: false,
-                    message: `此邀请码使用次数已达上限（${CONFIG.MAX_USE_COUNT}次）`
+                    message: `邀请码使用次数已用尽，请联系管理员获取新邀请码`
                 };
             }
 
             // 更新邀请码信息
+            const now = new Date().toISOString();
             if (!invite.deviceId) {
                 invite.deviceId = deviceId;
+                invite.boundAt = now; // 记录绑定时间
             }
+            
+            // 初始化使用记录数组
+            if (!invite.usageHistory) {
+                invite.usageHistory = [];
+            }
+            
+            // 添加使用记录
+            const usageRecord = {
+                deviceId: deviceId,
+                usedAt: now,
+                userAgent: navigator.userAgent || 'unknown',
+                ip: 'unknown' // 前端无法获取真实IP，需要后端记录
+            };
+            invite.usageHistory.push(usageRecord);
+            
             invite.usedCount = currentUsedCount + 1;
-            invite.lastUsedAt = new Date().toISOString();
+            invite.lastUsedAt = now;
 
             // 保存更新到本地
             const saved = Storage.setInviteCodes(inviteCodes);
@@ -427,11 +483,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
 
-            if (typeof Logger !== 'undefined') Logger.log('邀请码验证成功，当前使用次数:', invite.usedCount);
+            const remaining = CONFIG.MAX_USE_COUNT - invite.usedCount;
+            if (typeof Logger !== 'undefined') Logger.log('邀请码验证成功，当前使用次数:', invite.usedCount, '剩余次数:', remaining);
 
             return {
                 success: true,
-                message: '验证成功'
+                message: `邀请码验证成功！剩余可用次数：${remaining}次`,
+                usedCount: invite.usedCount,
+                remaining: remaining
             };
         } catch (error) {
             console.error('验证邀请码时出错:', error);

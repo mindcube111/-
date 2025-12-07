@@ -13,3 +13,4 @@ Write-Host "请复制上面的盐值，用于配置 Cloudflare 环境变量 INVI
 # $salt2 = -join ((65..90) + (97..122) + (48..57) | Get-Random -Count 32 | ForEach-Object {[char]$_})
 # Write-Host "备用方法生成的盐值: $salt2" -ForegroundColor Cyan
 
+

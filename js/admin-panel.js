@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const adminPanelOverlay = document.getElementById('admin-panel-overlay');
     const adminPanelClose = document.getElementById('admin-panel-close');
     const adminLoginForm = document.getElementById('admin-login-form');
+    const adminUsernameInput = document.getElementById('admin-username-input');
     const adminPasswordInput = document.getElementById('admin-password-input');
     const adminLoginSection = document.getElementById('admin-login-section');
     const adminFunctions = document.getElementById('admin-functions');
@@ -19,6 +20,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const adminRemainingCodes = document.getElementById('admin-remaining-codes');
     const adminCopyAllBtn = document.getElementById('admin-copy-all-btn');
     const adminCopyUnusedBtn = document.getElementById('admin-copy-unused-btn');
+    const adminExportAllBtn = document.getElementById('admin-export-all-btn');
+    const adminRefreshBtn = document.getElementById('admin-refresh-btn');
     const adminCodesList = document.getElementById('admin-codes-list');
     const adminFilterButtons = document.querySelectorAll('.admin-filter-btn');
     const adminPagination = document.getElementById('admin-pagination');
@@ -26,7 +29,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const adminNextPage = document.getElementById('admin-next-page');
     const adminPaginationInfo = document.getElementById('admin-pagination-info');
     const adminLogoutBtnHeader = document.getElementById('admin-logout-btn-header');
-    const adminSettingsBtn = document.getElementById('admin-settings-btn');
 
     let adminToken = sessionStorage.getItem('admin_token');
     let isLoggedIn = !!adminToken;
@@ -94,6 +96,14 @@ document.addEventListener('DOMContentLoaded', function() {
             adminCopyUnusedBtn.addEventListener('click', copyUnusedCodes);
         }
 
+        if (adminExportAllBtn) {
+            adminExportAllBtn.addEventListener('click', exportAllRecords);
+        }
+
+        if (adminRefreshBtn) {
+            adminRefreshBtn.addEventListener('click', refreshData);
+        }
+
         if (adminFilterButtons) {
             adminFilterButtons.forEach(btn => {
                 btn.addEventListener('click', () => {
@@ -129,11 +139,6 @@ document.addEventListener('DOMContentLoaded', function() {
             adminLogoutBtnHeader.addEventListener('click', handleLogout);
         }
 
-        if (adminSettingsBtn) {
-            adminSettingsBtn.addEventListener('click', () => {
-                alert('设置功能开发中...');
-            });
-        }
     }
 
     function toggleAdminPanel() {
@@ -156,7 +161,13 @@ document.addEventListener('DOMContentLoaded', function() {
 
     async function handleLogin(e) {
         e.preventDefault();
+        const username = adminUsernameInput ? adminUsernameInput.value.trim() : '';
         const password = adminPasswordInput.value.trim();
+        
+        if (!username) {
+            showMessage(adminLoginMessage, '请输入账号', 'error');
+            return;
+        }
         
         if (!password) {
             showMessage(adminLoginMessage, '请输入密码', 'error');
@@ -169,7 +180,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ password })
+                body: JSON.stringify({ username, password })
             });
 
             const data = await response.json();
@@ -180,9 +191,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 isLoggedIn = true;
                 showAdminFunctions();
                 showMessage(adminLoginMessage, '登录成功', 'success');
+                if (adminUsernameInput) adminUsernameInput.value = '';
                 adminPasswordInput.value = '';
             } else {
-                showMessage(adminLoginMessage, '密码错误', 'error');
+                showMessage(adminLoginMessage, '账号或密码错误', 'error');
             }
         } catch (error) {
             console.error('登录失败:', error);
@@ -194,6 +206,15 @@ document.addEventListener('DOMContentLoaded', function() {
         adminToken = null;
         sessionStorage.removeItem('admin_token');
         isLoggedIn = false;
+        if (adminUsernameInput) adminUsernameInput.value = '';
+        if (adminPasswordInput) adminPasswordInput.value = '';
+        const form = adminLoginSection ? adminLoginSection.querySelector('form') : null;
+        if (form) {
+            const inputs = form.querySelectorAll('input');
+            inputs.forEach(input => input.style.display = 'block');
+            const loginBtn = form.querySelector('button[type="submit"]');
+            if (loginBtn) loginBtn.style.display = 'block';
+        }
         showLoginForm();
         showMessage(adminLoginMessage, '已退出登录', 'success');
     }
@@ -201,14 +222,27 @@ document.addEventListener('DOMContentLoaded', function() {
     function showLoginForm() {
         if (adminLoginSection) adminLoginSection.style.display = 'block';
         if (adminFunctions) adminFunctions.classList.remove('show');
+        const form = adminLoginSection ? adminLoginSection.querySelector('form') : null;
+        if (form) form.style.display = 'block';
+        if (adminLogoutBtnHeader) adminLogoutBtnHeader.style.display = 'none';
+        stopAutoRefresh(); // 停止自动刷新
     }
 
     function showAdminFunctions() {
-        if (adminLoginSection) adminLoginSection.style.display = 'none';
+        if (adminLoginSection) adminLoginSection.style.display = 'block';
+        const form = adminLoginSection ? adminLoginSection.querySelector('form') : null;
+        if (form) {
+            const inputs = form.querySelectorAll('input');
+            inputs.forEach(input => input.style.display = 'none');
+            const loginBtn = form.querySelector('button[type="submit"]');
+            if (loginBtn) loginBtn.style.display = 'none';
+        }
         if (adminFunctions) adminFunctions.classList.add('show');
+        if (adminLogoutBtnHeader) adminLogoutBtnHeader.style.display = 'block';
         loadInviteCodes();
         updateStats();
         renderCodesList();
+        startAutoRefresh(); // 启动自动刷新
     }
 
     function showMessage(element, message, type) {
@@ -276,7 +310,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         deviceId: null,
                         usedCount: 0,
                         createdAt: new Date().toISOString(),
-                        lastUsedAt: null
+                        lastUsedAt: null,
+                        boundAt: null,
+                        disabled: false,
+                        usageHistory: []
                     }));
                     
                     // 先加载现有列表，避免覆盖
@@ -296,9 +333,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         navigator.clipboard.writeText(successCodes.join('\n'));
                     }
 
+                    const maxCount = CONFIG.MAX_USE_COUNT || 3;
+                    const expiryDate = new Date();
+                    expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+                    const expiryStr = expiryDate.toLocaleDateString('zh-CN');
                     showMessage(
                         adminGenerateMessage, 
-                        `成功生成 ${successCodes.length} 个邀请码${failedCodes.length > 0 ? `，${failedCodes.length} 个失败` : ''}，已复制到剪贴板`,
+                        `成功生成 ${successCodes.length} 个邀请码${failedCodes.length > 0 ? `，${failedCodes.length} 个失败` : ''}，已复制到剪贴板。每个邀请码有效期至${expiryStr}，限${maxCount}次使用。`,
                         'success'
                     );
                 } else {
@@ -360,16 +401,20 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     function getFilteredCodes() {
         let filtered = [...allInviteCodes];
+        const maxCount = CONFIG.MAX_USE_COUNT || 3;
         
         if (currentFilter === 'unused') {
-            filtered = filtered.filter(code => (code.usedCount || 0) === 0);
+            filtered = filtered.filter(code => (code.usedCount || 0) === 0 && code.disabled !== true);
         } else if (currentFilter === 'partial') {
             filtered = filtered.filter(code => {
                 const used = code.usedCount || 0;
-                return used > 0 && used < 3;
+                return used > 0 && used < maxCount && code.disabled !== true;
             });
         } else if (currentFilter === 'used') {
-            filtered = filtered.filter(code => (code.usedCount || 0) >= 3);
+            filtered = filtered.filter(code => {
+                const used = code.usedCount || 0;
+                return used >= maxCount || code.disabled === true;
+            });
         }
         
         // 按创建时间倒序
@@ -424,22 +469,30 @@ document.addEventListener('DOMContentLoaded', function() {
         let html = '';
         pageCodes.forEach(code => {
             const usedCount = code.usedCount || 0;
+            const maxCount = CONFIG.MAX_USE_COUNT || 3;
+            const remaining = Math.max(0, maxCount - usedCount);
             let statusClass = 'unused';
             let statusText = '未使用';
             
-            if (usedCount >= 3) {
+            if (code.disabled === true) {
                 statusClass = 'used';
-                statusText = '已用完';
+                statusText = '已禁用';
+            } else if (usedCount >= maxCount) {
+                statusClass = 'used';
+                statusText = '已失效';
             } else if (usedCount > 0) {
                 statusClass = 'partial';
-                statusText = `已使用 ${usedCount}/3`;
+                statusText = `使用中 ${usedCount}/${maxCount}`;
             }
 
             const createdAt = code.createdAt ? formatDate(code.createdAt) : '未知';
             const lastUsedAt = code.lastUsedAt ? formatDate(code.lastUsedAt) : null;
+            const boundAt = code.boundAt ? formatDate(code.boundAt) : null;
+            const deviceId = code.deviceId ? (code.deviceId.substring(0, 20) + '...') : '未绑定';
+            const usageHistory = code.usageHistory || [];
 
             html += `
-                <div class="admin-code-item">
+                <div class="admin-code-item ${code.disabled ? 'disabled' : ''}">
                     <div class="admin-code-header">
                         <div class="admin-code-text">${code.code}</div>
                         <div class="admin-code-status ${statusClass}">${statusText}</div>
@@ -451,17 +504,41 @@ document.addEventListener('DOMContentLoaded', function() {
                         </div>
                         <div class="admin-code-info-item">
                             <span class="admin-code-info-label">使用次数：</span>
-                            <span class="admin-code-info-value">${usedCount}/3</span>
+                            <span class="admin-code-info-value">${usedCount}/${maxCount} (剩余${remaining}次)</span>
                         </div>
+                        ${code.deviceId ? `
+                        <div class="admin-code-info-item">
+                            <span class="admin-code-info-label">绑定设备：</span>
+                            <span class="admin-code-info-value" title="${code.deviceId}">${deviceId}</span>
+                        </div>
+                        ${boundAt ? `
+                        <div class="admin-code-info-item">
+                            <span class="admin-code-info-label">绑定时间：</span>
+                            <span class="admin-code-info-value">${boundAt}</span>
+                        </div>
+                        ` : ''}
+                        ` : ''}
                         ${lastUsedAt ? `
                         <div class="admin-code-info-item">
                             <span class="admin-code-info-label">最后使用：</span>
                             <span class="admin-code-info-value">${lastUsedAt}</span>
                         </div>
                         ` : ''}
+                        ${usageHistory.length > 0 ? `
+                        <div class="admin-code-info-item">
+                            <span class="admin-code-info-label">使用记录：</span>
+                            <button class="admin-code-action-btn small" onclick="showUsageHistory('${code.code}')">查看详情 (${usageHistory.length}条)</button>
+                        </div>
+                        ` : ''}
                     </div>
                     <div class="admin-code-actions">
                         <button class="admin-code-action-btn" onclick="copyCode('${code.code}')">复制</button>
+                        ${code.disabled ? `
+                        <button class="admin-code-action-btn" onclick="enableCode('${code.code}')">启用</button>
+                        ` : `
+                        <button class="admin-code-action-btn" onclick="disableCode('${code.code}')">禁用</button>
+                        `}
+                        <button class="admin-code-action-btn" onclick="resetCode('${code.code}')">重置</button>
                         <button class="admin-code-action-btn delete" onclick="deleteCode('${code.code}')">删除</button>
                     </div>
                 </div>
@@ -514,6 +591,145 @@ document.addEventListener('DOMContentLoaded', function() {
     };
 
     /**
+     * 禁用邀请码
+     */
+    window.disableCode = function(code) {
+        const invite = allInviteCodes.find(c => c.code === code);
+        if (invite) {
+            invite.disabled = true;
+            saveInviteCodes();
+            renderCodesList();
+            showMessage(adminGenerateMessage, `邀请码 ${code} 已禁用`, 'success');
+        }
+    };
+
+    /**
+     * 启用邀请码
+     */
+    window.enableCode = function(code) {
+        const invite = allInviteCodes.find(c => c.code === code);
+        if (invite) {
+            invite.disabled = false;
+            saveInviteCodes();
+            renderCodesList();
+            showMessage(adminGenerateMessage, `邀请码 ${code} 已启用`, 'success');
+        }
+    };
+
+    /**
+     * 重置邀请码（清除使用记录和设备绑定）
+     */
+    window.resetCode = function(code) {
+        if (confirm(`确定要重置邀请码 ${code} 吗？将清除所有使用记录和设备绑定信息。`)) {
+            const invite = allInviteCodes.find(c => c.code === code);
+            if (invite) {
+                invite.usedCount = 0;
+                invite.deviceId = null;
+                invite.boundAt = null;
+                invite.lastUsedAt = null;
+                invite.disabled = false;
+                invite.usageHistory = [];
+                saveInviteCodes();
+                updateStats();
+                renderCodesList();
+                showMessage(adminGenerateMessage, `邀请码 ${code} 已重置`, 'success');
+            }
+        }
+    };
+
+    /**
+     * 显示使用记录详情
+     */
+    window.showUsageHistory = function(code) {
+        const invite = allInviteCodes.find(c => c.code === code);
+        if (!invite || !invite.usageHistory || invite.usageHistory.length === 0) {
+            alert('该邀请码暂无使用记录');
+            return;
+        }
+
+        let historyText = `邀请码 ${code} 使用记录：\n\n`;
+        invite.usageHistory.forEach((record, index) => {
+            const date = record.usedAt ? formatDate(record.usedAt) : '未知';
+            const deviceId = record.deviceId ? record.deviceId.substring(0, 30) + '...' : '未知';
+            historyText += `第${index + 1}次使用：\n`;
+            historyText += `  时间：${date}\n`;
+            historyText += `  设备ID：${deviceId}\n`;
+            historyText += `  用户代理：${record.userAgent ? record.userAgent.substring(0, 50) + '...' : '未知'}\n\n`;
+        });
+
+        // 创建模态框显示详情
+        const modal = document.createElement('div');
+        modal.className = 'admin-modal-overlay';
+        modal.innerHTML = `
+            <div class="admin-modal">
+                <div class="admin-modal-header">
+                    <h3>邀请码 ${code} 使用记录</h3>
+                    <button class="admin-modal-close" onclick="this.closest('.admin-modal-overlay').remove()">&times;</button>
+                </div>
+                <div class="admin-modal-content">
+                    <div class="usage-history-list">
+                        ${invite.usageHistory.map((record, index) => {
+                            const date = record.usedAt ? formatDate(record.usedAt) : '未知';
+                            const deviceId = record.deviceId || '未知';
+                            const userAgent = record.userAgent || '未知';
+                            return `
+                                <div class="usage-history-item">
+                                    <div class="usage-history-header">
+                                        <span class="usage-index">第${index + 1}次使用</span>
+                                        <span class="usage-date">${date}</span>
+                                    </div>
+                                    <div class="usage-history-details">
+                                        <div><strong>设备ID：</strong>${deviceId}</div>
+                                        <div><strong>用户代理：</strong>${userAgent.substring(0, 80)}${userAgent.length > 80 ? '...' : ''}</div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+                <div class="admin-modal-footer">
+                    <button class="admin-btn" onclick="exportUsageHistory('${code}')">导出记录</button>
+                    <button class="admin-btn admin-btn-secondary" onclick="this.closest('.admin-modal-overlay').remove()">关闭</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    };
+
+    /**
+     * 导出使用记录
+     */
+    window.exportUsageHistory = function(code) {
+        const invite = allInviteCodes.find(c => c.code === code);
+        if (!invite || !invite.usageHistory || invite.usageHistory.length === 0) {
+            alert('该邀请码暂无使用记录');
+            return;
+        }
+
+        // 生成CSV内容
+        let csv = '序号,使用时间,设备ID,用户代理\n';
+        invite.usageHistory.forEach((record, index) => {
+            const date = record.usedAt ? new Date(record.usedAt).toLocaleString('zh-CN') : '未知';
+            const deviceId = record.deviceId || '未知';
+            const userAgent = (record.userAgent || '未知').replace(/,/g, ';');
+            csv += `${index + 1},${date},${deviceId},${userAgent}\n`;
+        });
+
+        // 下载CSV文件
+        const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `邀请码_${code}_使用记录_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        showMessage(adminGenerateMessage, '使用记录已导出', 'success');
+    };
+
+    /**
      * 复制所有邀请码
      */
     function copyAllCodes() {
@@ -553,16 +769,107 @@ document.addEventListener('DOMContentLoaded', function() {
      * 更新统计信息
      */
     function updateStats() {
+        const maxCount = CONFIG.MAX_USE_COUNT || 3;
         const total = allInviteCodes.length;
         const used = allInviteCodes.reduce((sum, code) => sum + (code.usedCount || 0), 0);
         const remaining = allInviteCodes.reduce((sum, code) => {
+            if (code.disabled === true) return sum;
             const usedCount = code.usedCount || 0;
-            return sum + Math.max(0, 3 - usedCount);
+            return sum + Math.max(0, maxCount - usedCount);
         }, 0);
 
         if (adminTotalCodes) adminTotalCodes.textContent = total;
         if (adminUsedCodes) adminUsedCodes.textContent = used;
         if (adminRemainingCodes) adminRemainingCodes.textContent = remaining;
+    }
+
+    /**
+     * 导出所有使用记录
+     */
+    function exportAllRecords() {
+        if (allInviteCodes.length === 0) {
+            showMessage(adminGenerateMessage, '没有数据可导出', 'error');
+            return;
+        }
+
+        // 生成CSV内容
+        let csv = '邀请码,使用次数,剩余次数,状态,创建时间,绑定设备,最后使用时间\n';
+        
+        allInviteCodes.forEach(code => {
+            const maxCount = CONFIG.MAX_USE_COUNT || 3;
+            const usedCount = code.usedCount || 0;
+            const remaining = Math.max(0, maxCount - usedCount);
+            let status = '未使用';
+            if (code.disabled === true) {
+                status = '已禁用';
+            } else if (usedCount >= maxCount) {
+                status = '已失效';
+            } else if (usedCount > 0) {
+                status = '使用中';
+            }
+            
+            const createdAt = code.createdAt ? new Date(code.createdAt).toLocaleString('zh-CN') : '未知';
+            const deviceId = code.deviceId || '未绑定';
+            const lastUsedAt = code.lastUsedAt ? new Date(code.lastUsedAt).toLocaleString('zh-CN') : '从未使用';
+            
+            csv += `${code.code},${usedCount},${remaining},${status},${createdAt},${deviceId},${lastUsedAt}\n`;
+        });
+
+        // 下载CSV文件
+        const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `邀请码使用记录_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        showMessage(adminGenerateMessage, '所有记录已导出', 'success');
+    }
+
+    /**
+     * 刷新数据
+     */
+    function refreshData() {
+        if (adminRefreshBtn) {
+            adminRefreshBtn.disabled = true;
+            adminRefreshBtn.textContent = '刷新中...';
+        }
+        
+        // 重新加载数据
+        loadInviteCodes();
+        updateStats();
+        renderCodesList();
+        
+        setTimeout(() => {
+            if (adminRefreshBtn) {
+                adminRefreshBtn.disabled = false;
+                adminRefreshBtn.textContent = '刷新数据';
+            }
+            showMessage(adminGenerateMessage, '数据已刷新', 'success');
+        }, 500);
+    }
+
+    // 自动刷新（每30秒）
+    let autoRefreshInterval = null;
+    function startAutoRefresh() {
+        if (autoRefreshInterval) clearInterval(autoRefreshInterval);
+        autoRefreshInterval = setInterval(() => {
+            if (isLoggedIn && adminFunctions && adminFunctions.classList.contains('show')) {
+                loadInviteCodes();
+                updateStats();
+                renderCodesList();
+            }
+        }, 30000); // 30秒刷新一次
+    }
+
+    function stopAutoRefresh() {
+        if (autoRefreshInterval) {
+            clearInterval(autoRefreshInterval);
+            autoRefreshInterval = null;
+        }
     }
 
     // 暴露给全局，方便调试
