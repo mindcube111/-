@@ -1,6 +1,22 @@
 /* 管理员面板样式 */
 
-/* 管理员入口按钮（文字样式） */
+/* 管理员入口链接（文字样式，与footer文字一致） */
+.admin-login-link {
+    color: var(--text-muted);
+    font-size: 12px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: color 0.3s ease;
+    display: inline-block;
+    margin-top: 8px;
+}
+
+.admin-login-link:hover {
+    color: var(--accent);
+    text-decoration: underline;
+}
+
+/* 兼容旧的按钮样式（如果其他地方使用） */
 .admin-toggle-btn,
 .admin-login-text-btn {
     background: transparent;

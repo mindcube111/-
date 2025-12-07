@@ -51,7 +51,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // 绑定事件
         if (adminToggleBtn) {
-            adminToggleBtn.addEventListener('click', toggleAdminPanel);
+            adminToggleBtn.addEventListener('click', function(e) {
+                e.preventDefault(); // 阻止链接默认跳转
+                toggleAdminPanel();
+            });
         }
 
         if (adminPanelClose) {
