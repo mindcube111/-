@@ -41,12 +41,7 @@ export const onRequestPost = async ({ request, env }) => {
     });
     return Response.json({ 
       ok: false, 
-      message: "invalid",
-      debug: {
-        code: code,
-        hashPrefix: hash.substring(0, 16),
-        reason: "邀请码不存在于 KV 中，请检查：1. 邀请码是否正确生成并添加到 KV 2. INVITE_SALT 是否一致"
-      }
+      message: "invalid"
     }, { status: 404 });
   }
   
@@ -67,16 +62,16 @@ export const onRequestPost = async ({ request, env }) => {
     return Response.json({ ok: false, message: "used" }, { status: 410 });
   }
 
-  // 更新使用次数
+  // 验证时不增加使用次数，只更新最后验证时间
+  // 使用次数在测试完成时通过 update-invite-usage API 增加
   const updatedRecord = {
     ...record,
-    usedCount: usedCount + 1,
-    lastUsedAt: new Date().toISOString(),
+    lastVerifiedAt: new Date().toISOString(), // 记录验证时间，但不增加使用次数
     // 保留旧字段以兼容
-    used: usedCount + 1 >= MAX_USE_COUNT
+    used: usedCount >= MAX_USE_COUNT
   };
 
   await env.INVITE_CODES.put(hash, JSON.stringify(updatedRecord));
-  return Response.json({ ok: true, usedCount: updatedRecord.usedCount, remaining: MAX_USE_COUNT - updatedRecord.usedCount });
+  return Response.json({ ok: true, usedCount: usedCount, remaining: MAX_USE_COUNT - usedCount });
 };
 

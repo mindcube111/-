@@ -1627,8 +1627,218 @@ function renderResult() {
 }
 
 // ==================== 更新邀请码使用记录 ====================
+
+/**
+ * 带指数退避的重试机制
+ * @param {Function} fn - 要重试的异步函数
+ * @param {Object} options - 重试选项
+ * @param {number} options.maxRetries - 最大重试次数（默认3）
+ * @param {number} options.initialDelay - 初始延迟（毫秒，默认1000）
+ * @param {number} options.maxDelay - 最大延迟（毫秒，默认10000）
+ * @param {Function} options.shouldRetry - 判断是否应该重试的函数 (error, attempt) => boolean
+ * @returns {Promise<any>}
+ */
+async function retryWithBackoff(fn, options = {}) {
+  const {
+    maxRetries = 3,
+    initialDelay = 1000,
+    maxDelay = 10000,
+    shouldRetry = (error, attempt) => {
+      // 默认重试网络错误和5xx错误
+      if (error.name === 'TypeError' && error.message.includes('fetch')) return true;
+      if (error.status >= 500 && error.status < 600) return true;
+      return false;
+    }
+  } = options;
+
+  let lastError;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      
+      // 如果是最后一次尝试，直接抛出错误
+      if (attempt === maxRetries) {
+        throw error;
+      }
+      
+      // 判断是否应该重试
+      if (!shouldRetry(error, attempt)) {
+        throw error;
+      }
+      
+      // 计算延迟时间（指数退避）
+      const delay = Math.min(initialDelay * Math.pow(2, attempt), maxDelay);
+      const jitter = Math.random() * 0.3 * delay; // 添加随机抖动，避免雷群效应
+      const finalDelay = delay + jitter;
+      
+      console.warn(`[retryWithBackoff] 第 ${attempt + 1} 次尝试失败，${Math.round(finalDelay)}ms 后重试...`, error);
+      await new Promise(resolve => setTimeout(resolve, finalDelay));
+    }
+  }
+  
+  throw lastError;
+}
+
+/**
+ * 调用更新邀请码使用记录的 API（带重试机制）
+ * @param {string} code - 邀请码
+ * @param {number} usedCount - 使用次数
+ * @param {string} lastUsedAt - 最后使用时间
+ * @param {string} deviceId - 设备ID
+ * @returns {Promise<Object>} API 响应结果
+ */
+async function updateInviteUsageAPI(code, usedCount, lastUsedAt, deviceId) {
+  const requestBody = {
+    code,
+    usedCount,
+    lastUsedAt,
+    deviceId
+  };
+
+  return await retryWithBackoff(async () => {
+    const response = await fetch('/api/update-invite-usage', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    // 对于非 200 响应，抛出错误以便重试机制处理
+    if (!response.ok) {
+      let errorMessage = '未知错误';
+      try {
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const errorJson = await response.json();
+          errorMessage = errorJson.message || errorJson.error || JSON.stringify(errorJson);
+        } else {
+          errorMessage = await response.text();
+        }
+      } catch (e) {
+        console.error('[updateInviteUsageAPI] 解析错误响应失败:', e);
+      }
+      
+      const error = new Error(errorMessage);
+      error.status = response.status;
+      error.response = response;
+      throw error;
+    }
+
+    return await response.json().catch(() => ({}));
+  }, {
+    maxRetries: 3,
+    initialDelay: 1000,
+    maxDelay: 10000,
+    shouldRetry: (error, attempt) => {
+      // 重试网络错误和5xx服务器错误，不重试4xx客户端错误
+      if (error.name === 'TypeError' && error.message.includes('fetch')) return true;
+      if (error.status >= 500 && error.status < 600) return true;
+      if (error.status >= 400 && error.status < 500) return false; // 4xx 不重试
+      return false;
+    }
+  });
+}
+
+/**
+ * 回滚 API 操作（如果本地保存失败但 API 成功）
+ * 注意：由于 API 可能不支持回滚，这里只是标记数据不一致
+ * @param {string} code - 邀请码
+ * @param {number} previousUsedCount - 之前的 usedCount 值
+ * @returns {Promise<void>}
+ */
+async function markDataInconsistency(code, previousUsedCount) {
+  try {
+    // 将不一致标记存储到 localStorage，供后续恢复使用
+    const inconsistencyKey = `invite_inconsistency_${code}`;
+    const inconsistencyData = {
+      code,
+      previousUsedCount,
+      timestamp: new Date().toISOString(),
+      resolved: false
+    };
+    localStorage.setItem(inconsistencyKey, JSON.stringify(inconsistencyData));
+    console.warn(`[updateInviteCodeUsage] 数据不一致已标记: ${code}，之前的 usedCount: ${previousUsedCount}`);
+  } catch (error) {
+    console.error('[updateInviteCodeUsage] 标记数据不一致失败:', error);
+  }
+}
+
+/**
+ * 批量更新邀请码使用记录（为将来扩展准备）
+ * @param {Array<Object>} updates - 更新列表，每个对象包含 {code, usedCount, lastUsedAt, deviceId}
+ * @returns {Promise<Array<Object>>} 更新结果列表
+ */
+async function batchUpdateInviteUsage(updates) {
+  if (!Array.isArray(updates) || updates.length === 0) {
+    return [];
+  }
+
+  // 如果只有一个更新，使用单个更新逻辑
+  if (updates.length === 1) {
+    const update = updates[0];
+    try {
+      await updateInviteUsageAPI(update.code, update.usedCount, update.lastUsedAt, update.deviceId);
+      return [{ code: update.code, success: true }];
+    } catch (error) {
+      return [{ code: update.code, success: false, error: error.message }];
+    }
+  }
+
+  // 批量更新：并发执行，但限制并发数
+  const BATCH_SIZE = 5; // 每批处理5个
+  const results = [];
+
+  for (let i = 0; i < updates.length; i += BATCH_SIZE) {
+    const batch = updates.slice(i, i + BATCH_SIZE);
+    const batchPromises = batch.map(async (update) => {
+      try {
+        await updateInviteUsageAPI(update.code, update.usedCount, update.lastUsedAt, update.deviceId);
+        return { code: update.code, success: true };
+      } catch (error) {
+        return { code: update.code, success: false, error: error.message };
+      }
+    });
+
+    const batchResults = await Promise.allSettled(batchPromises);
+    results.push(...batchResults.map(r => r.status === 'fulfilled' ? r.value : { success: false, error: r.reason }));
+  }
+
+  return results;
+}
+
 async function updateInviteCodeUsage() {
   try {
+    // 防御性检查：验证 Storage 和 DeviceManager 是否存在
+    if (typeof Storage === 'undefined' || Storage === null) {
+      console.warn('Storage 未定义，跳过更新邀请码使用记录');
+      return;
+    }
+    
+    if (typeof DeviceManager === 'undefined' || DeviceManager === null) {
+      console.warn('DeviceManager 未定义，跳过更新邀请码使用记录');
+      return;
+    }
+    
+    // 验证必需的方法是否存在且为函数
+    if (typeof Storage.getCurrentInviteCode !== 'function') {
+      console.warn('Storage.getCurrentInviteCode 不是函数，跳过更新邀请码使用记录');
+      return;
+    }
+    
+    if (typeof Storage.getInviteCodes !== 'function') {
+      console.warn('Storage.getInviteCodes 不是函数，跳过更新邀请码使用记录');
+      return;
+    }
+    
+    if (typeof DeviceManager.getDeviceId !== 'function') {
+      console.warn('DeviceManager.getDeviceId 不是函数，跳过更新邀请码使用记录');
+      return;
+    }
+    
     // 获取当前使用的邀请码
     const currentCode = Storage.getCurrentInviteCode();
     if (!currentCode) {
@@ -1636,7 +1846,9 @@ async function updateInviteCodeUsage() {
       return;
     }
 
-    const inviteCodes = Storage.getInviteCodes() || [];
+    // 使用安全访问获取邀请码列表，确保返回的是数组
+    const inviteCodesRaw = Storage.getInviteCodes();
+    const inviteCodes = Array.isArray(inviteCodesRaw) ? inviteCodesRaw : [];
     const deviceId = DeviceManager.getDeviceId();
     const invite = inviteCodes.find(item => item && item.code === currentCode);
     
@@ -1655,14 +1867,24 @@ async function updateInviteCodeUsage() {
     }
     
     // 检查是否已有本次测试的使用记录（避免重复添加）
-    const today = new Date().toISOString().split('T')[0];
-    const hasTodayRecord = invite.usageHistory.some(record => {
-      const recordDate = new Date(record.usedAt).toISOString().split('T')[0];
-      return recordDate === today && record.testCompleted === true;
-    });
+    // 查找最近的验证记录（testCompleted: false）并标记为完成
+    let hasUpdatedRecord = false;
+    if (invite.usageHistory && invite.usageHistory.length > 0) {
+      // 从后往前查找最近的未完成测试记录
+      for (let i = invite.usageHistory.length - 1; i >= 0; i--) {
+        const record = invite.usageHistory[i];
+        if (record.testCompleted === false && record.deviceId === deviceId) {
+          // 找到最近的验证记录，标记为测试完成
+          record.testCompleted = true;
+          record.usedAt = now; // 更新为测试完成时间
+          hasUpdatedRecord = true;
+          break;
+        }
+      }
+    }
     
-    // 如果没有今天的测试完成记录，添加一条
-    if (!hasTodayRecord) {
+    // 如果没有找到未完成的记录，添加新的测试完成记录
+    if (!hasUpdatedRecord) {
       invite.usageHistory.push({
         deviceId: deviceId,
         usedAt: now,
@@ -1672,30 +1894,98 @@ async function updateInviteCodeUsage() {
       });
     }
     
+    // 增加使用次数（测试完成时）
+    // 每次测试完成都应该递增使用次数，无论是否找到了未完成的记录
+    // 确保 usedCount 存在且为数字类型
+    const parseUsedCount = (value) => {
+      if (value === undefined || value === null) return 0;
+      const parsed = parseInt(value, 10);
+      return isNaN(parsed) ? 0 : Math.max(0, parsed); // 确保非负数
+    };
+    
+    const currentUsedCount = parseUsedCount(invite.usedCount);
+    const maxCount = CONFIG?.MAX_USE_COUNT || 3;
+    
+    // 只有在未达到上限时才增加
+    if (currentUsedCount < maxCount) {
+      invite.usedCount = currentUsedCount + 1;
+      console.log(`[updateInviteCodeUsage] 邀请码使用次数已递增: ${currentUsedCount} -> ${invite.usedCount} (上限: ${maxCount})`);
+    } else {
+      console.warn(`[updateInviteCodeUsage] 邀请码使用次数已达上限 (${currentUsedCount}/${maxCount})，无法继续增加`);
+      // 即使达到上限，也确保 usedCount 字段存在
+      invite.usedCount = currentUsedCount;
+    }
+    
+    // 验证 usedCount 是有效数字
+    if (typeof invite.usedCount !== 'number' || isNaN(invite.usedCount) || invite.usedCount < 0) {
+      console.error(`[updateInviteCodeUsage] 无效的 usedCount 值: ${invite.usedCount}，使用当前值: ${currentUsedCount}`);
+      invite.usedCount = currentUsedCount;
+    }
+    
+    // 保存更新前的状态，用于数据一致性检查
+    const previousUsedCount = currentUsedCount;
+    const previousInviteCodes = JSON.parse(JSON.stringify(inviteCodes)); // 深拷贝
+    
     // 保存到本地存储
-    Storage.setInviteCodes(inviteCodes);
+    const saved = Storage.setInviteCodes(inviteCodes);
+    if (!saved) {
+      console.error('[updateInviteCodeUsage] 保存邀请码到本地存储失败');
+      // 标记本地保存失败，但继续尝试同步到服务器
+    } else {
+      console.log('[updateInviteCodeUsage] 邀请码已保存到本地存储');
+    }
     
     // 同步到后端API（如果使用API验证）
+    // 使用带重试机制的 API 调用
+    console.log(`[updateInviteCodeUsage] 准备发送到API: code=${currentCode}, usedCount=${invite.usedCount}, lastUsedAt=${now}`);
+    
+    let apiSuccess = false;
+    let apiResult = null;
+    
     try {
-      const response = await fetch('/api/update-invite-usage', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          code: currentCode,
-          usedCount: invite.usedCount,
-          lastUsedAt: now,
-          deviceId: deviceId
-        })
-      });
+      apiResult = await updateInviteUsageAPI(currentCode, invite.usedCount, now, deviceId);
+      apiSuccess = true;
+      console.log('[updateInviteCodeUsage] 邀请码使用记录已同步到服务器', apiResult);
       
-      if (response.ok) {
-        console.log('邀请码使用记录已同步到服务器');
+      // 如果服务器返回了更新后的 usedCount，可以用于验证
+      if (apiResult.usedCount !== undefined && apiResult.usedCount !== invite.usedCount) {
+        console.warn(`[updateInviteCodeUsage] 服务器返回的 usedCount (${apiResult.usedCount}) 与发送的值 (${invite.usedCount}) 不一致`);
+        // 可以选择使用服务器返回的值来同步本地数据
+        invite.usedCount = apiResult.usedCount;
+        // 重新保存到本地存储
+        Storage.setInviteCodes(inviteCodes);
       }
     } catch (apiError) {
-      console.log('同步到服务器失败（可能未配置API）:', apiError);
-      // API同步失败不影响本地使用
+      apiSuccess = false;
+      console.error('[updateInviteCodeUsage] 同步到服务器失败（已重试）:', apiError);
+      
+      // 如果本地保存成功但 API 失败，数据仍然在本地，这是可接受的
+      // 但如果本地保存失败且 API 也失败，需要处理
+      if (!saved) {
+        console.error('[updateInviteCodeUsage] 本地保存和 API 同步都失败，数据可能丢失');
+        // 可以尝试恢复之前的状态
+        try {
+          Storage.setInviteCodes(previousInviteCodes);
+          console.log('[updateInviteCodeUsage] 已尝试恢复到之前的状态');
+        } catch (recoverError) {
+          console.error('[updateInviteCodeUsage] 恢复状态失败:', recoverError);
+        }
+      }
+    }
+    
+    // 数据一致性检查：如果本地保存失败但 API 成功，标记不一致
+    if (!saved && apiSuccess) {
+      console.warn('[updateInviteCodeUsage] 数据不一致：本地保存失败但 API 同步成功');
+      await markDataInconsistency(currentCode, previousUsedCount);
+      
+      // 尝试重新保存到本地（使用服务器返回的数据）
+      if (apiResult && apiResult.usedCount !== undefined) {
+        invite.usedCount = apiResult.usedCount;
+        const retrySaved = Storage.setInviteCodes(inviteCodes);
+        if (retrySaved) {
+          console.log('[updateInviteCodeUsage] 已使用服务器数据重新保存到本地');
+        }
+      }
     }
     
     // 触发管理员面板数据刷新（如果打开的话）

@@ -1,0 +1,85 @@
+{
+  "routes": [
+    {
+      "routePath": "/api/storage/get",
+      "mountPath": "/api/storage",
+      "method": "POST",
+      "module": [
+        "api/storage/get.js:onRequestPost"
+      ]
+    },
+    {
+      "routePath": "/api/storage/set",
+      "mountPath": "/api/storage",
+      "method": "POST",
+      "module": [
+        "api/storage/set.js:onRequestPost"
+      ]
+    },
+    {
+      "routePath": "/api/user/data",
+      "mountPath": "/api/user",
+      "method": "POST",
+      "module": [
+        "api/user/data.js:onRequestPost"
+      ]
+    },
+    {
+      "routePath": "/api/user/save",
+      "mountPath": "/api/user",
+      "method": "POST",
+      "module": [
+        "api/user/save.js:onRequestPost"
+      ]
+    },
+    {
+      "routePath": "/api/add-invite",
+      "mountPath": "/api",
+      "method": "POST",
+      "module": [
+        "api/add-invite.js:onRequestPost"
+      ]
+    },
+    {
+      "routePath": "/api/admin-login",
+      "mountPath": "/api",
+      "method": "POST",
+      "module": [
+        "api/admin-login.js:onRequestPost"
+      ]
+    },
+    {
+      "routePath": "/api/health",
+      "mountPath": "/api",
+      "method": "GET",
+      "module": [
+        "api/health.js:onRequestGet"
+      ]
+    },
+    {
+      "routePath": "/api/list-invites",
+      "mountPath": "/api",
+      "method": "GET",
+      "module": [
+        "api/list-invites.js:onRequestGet"
+      ]
+    },
+    {
+      "routePath": "/api/update-invite-usage",
+      "mountPath": "/api",
+      "method": "POST",
+      "module": [
+        "api/update-invite-usage.js:onRequestPost"
+      ]
+    },
+    {
+      "routePath": "/api/verify-invite",
+      "mountPath": "/api",
+      "method": "POST",
+      "module": [
+        "api/verify-invite.js:onRequestPost"
+      ]
+    }
+  ],
+  "baseURL": "/"
+}

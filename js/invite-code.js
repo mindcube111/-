@@ -291,9 +291,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         };
                         inviteCodes.push(invite);
                     } else {
-                        // 更新现有记录
-                        const newUsedCount = data.usedCount || (invite.usedCount || 0) + 1;
-                        invite.usedCount = newUsedCount;
+                        // 更新现有记录（API验证时不增加使用次数）
+                        // 使用次数在测试完成时通过 update-invite-usage API 增加
+                        if (data.usedCount !== undefined) {
+                            invite.usedCount = data.usedCount; // 使用API返回的值，不增加
+                        }
                         invite.lastUsedAt = now;
                         if (!invite.deviceId) {
                             invite.deviceId = deviceId;
@@ -303,12 +305,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (!invite.usageHistory) {
                             invite.usageHistory = [];
                         }
-                        // 添加使用记录
+                        // 添加验证记录（标记为未完成测试）
                         invite.usageHistory.push({
                             deviceId: deviceId,
                             usedAt: now,
                             userAgent: navigator.userAgent || 'unknown',
-                            ip: 'unknown'
+                            ip: 'unknown',
+                            testCompleted: false // 标记为验证但未完成测试
                         });
                     }
                     
@@ -330,10 +333,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 let message = '邀请码验证失败';
                 if (data.message === 'invalid') {
                     message = '邀请码不存在或已失效';
-                    // 如果是刚生成的邀请码，提供额外提示
-                    if (data.debug && data.debug.reason) {
-                        message += '。' + data.debug.reason;
-                    }
                 } else if (data.message === 'used') {
                     message = '邀请码使用次数已用尽，请联系管理员获取新邀请码';
                 } else if (data.message === 'device_mismatch') {
@@ -450,16 +449,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 invite.usageHistory = [];
             }
             
-            // 添加使用记录
+            // 验证时不增加使用次数，只添加验证记录（标记为未完成测试）
             const usageRecord = {
                 deviceId: deviceId,
                 usedAt: now,
                 userAgent: navigator.userAgent || 'unknown',
-                ip: 'unknown' // 前端无法获取真实IP，需要后端记录
+                ip: 'unknown', // 前端无法获取真实IP，需要后端记录
+                testCompleted: false // 标记为验证但未完成测试
             };
             invite.usageHistory.push(usageRecord);
             
-            invite.usedCount = currentUsedCount + 1;
+            // 验证时不增加使用次数，使用次数在测试完成时增加
+            // invite.usedCount = currentUsedCount + 1; // 注释掉，测试完成时再增加
             invite.lastUsedAt = now;
 
             // 保存更新到本地
@@ -483,13 +484,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
 
-            const remaining = CONFIG.MAX_USE_COUNT - invite.usedCount;
-            if (typeof Logger !== 'undefined') Logger.log('邀请码验证成功，当前使用次数:', invite.usedCount, '剩余次数:', remaining);
+            // 验证时不增加使用次数，所以 remaining 基于当前使用次数
+            const remaining = CONFIG.MAX_USE_COUNT - currentUsedCount;
+            if (typeof Logger !== 'undefined') Logger.log('邀请码验证成功，当前使用次数:', currentUsedCount, '剩余次数:', remaining);
 
             return {
                 success: true,
                 message: `邀请码验证成功！剩余可用次数：${remaining}次`,
-                usedCount: invite.usedCount,
+                usedCount: currentUsedCount,
                 remaining: remaining
             };
         } catch (error) {

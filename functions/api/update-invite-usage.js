@@ -27,16 +27,24 @@ export const onRequestPost = async ({ request, env }) => {
     return Response.json({ ok: false, message: "invite code not found" }, { status: 404 });
   }
 
+  const MAX_USE_COUNT = 3; // 每个邀请码最多使用次数
+  
   // 更新最后使用时间（如果提供）
   const updatedRecord = {
     ...record,
     lastUsedAt: lastUsedAt || new Date().toISOString()
   };
 
-  // 如果提供了使用次数，确保一致
+  // 如果提供了使用次数，更新它（确保不超过上限）
   if (usedCount !== undefined) {
-    updatedRecord.usedCount = usedCount;
-    updatedRecord.used = usedCount >= 3;
+    const newUsedCount = Math.min(usedCount, MAX_USE_COUNT);
+    updatedRecord.usedCount = newUsedCount;
+    updatedRecord.used = newUsedCount >= MAX_USE_COUNT;
+    
+    // 确保兼容旧格式
+    if (updatedRecord.usedCount >= MAX_USE_COUNT) {
+      updatedRecord.used = true;
+    }
   }
 
   await env.INVITE_CODES.put(hash, JSON.stringify(updatedRecord));

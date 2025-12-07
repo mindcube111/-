@@ -14,3 +14,5 @@ Write-Host "请复制上面的盐值，用于配置 Cloudflare 环境变量 INVI
 # Write-Host "备用方法生成的盐值: $salt2" -ForegroundColor Cyan
 
 
+
+
