@@ -241,29 +241,52 @@ document.addEventListener('DOMContentLoaded', function() {
             });
 
             const data = await response.json();
+            
+            // 调试信息
+            if (typeof Logger !== 'undefined') {
+                Logger.log('API 验证响应:', {
+                    status: response.status,
+                    ok: response.ok,
+                    data: data
+                });
+            } else {
+                console.log('API 验证响应:', {
+                    status: response.status,
+                    ok: response.ok,
+                    data: data
+                });
+            }
 
             if (response.ok && data.ok) {
                 return {
                     success: true,
-                    message: '验证成功'
+                    message: '验证成功',
+                    usedCount: data.usedCount,
+                    remaining: data.remaining
                 };
             } else {
                 // 根据 API 返回的错误信息提供友好的提示
                 let message = '邀请码验证失败';
                 if (data.message === 'invalid') {
                     message = '邀请码不存在或已失效';
+                    // 如果是刚生成的邀请码，提供额外提示
+                    if (data.debug && data.debug.reason) {
+                        message += '。' + data.debug.reason;
+                    }
                 } else if (data.message === 'used') {
-                    message = '此邀请码已被使用';
+                    message = '此邀请码使用次数已达上限（3次）';
                 } else if (data.message) {
                     message = data.message;
                 }
                 return {
                     success: false,
-                    message: message
+                    message: message,
+                    debug: data.debug
                 };
             }
         } catch (error) {
             // 网络错误或其他错误，抛出异常以便回退到本地验证
+            console.error('API 验证请求失败:', error);
             throw error;
         }
     }

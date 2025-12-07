@@ -42,8 +42,13 @@ export const onRequestPost = async ({ request, env }) => {
     try {
       const hash = await sha256Hex(env.INVITE_SALT + code);
       
-      // 调试信息（生产环境可以移除）
-      console.log('添加邀请码:', { code, hash: hash.substring(0, 16) + '...' });
+      // 调试信息
+      console.log('添加邀请码:', { 
+        code, 
+        saltLength: env.INVITE_SALT ? env.INVITE_SALT.length : 0,
+        hash: hash.substring(0, 16) + '...',
+        fullHash: hash
+      });
       
       const existing = await env.INVITE_CODES.get(hash, "json");
       
@@ -65,9 +70,19 @@ export const onRequestPost = async ({ request, env }) => {
       // 验证写入是否成功
       const verify = await env.INVITE_CODES.get(hash, "json");
       if (!verify) {
+        console.error('KV 写入验证失败:', { code, hash: hash.substring(0, 16) + '...' });
         results.push({ code, ok: false, message: "failed to save to KV" });
         continue;
       }
+      
+      console.log('邀请码已成功添加到 KV:', { 
+        code, 
+        hash: hash.substring(0, 16) + '...',
+        verify: {
+          usedCount: verify.usedCount,
+          batch: verify.batch
+        }
+      });
       
       results.push({ code, ok: true });
     } catch (error) {
