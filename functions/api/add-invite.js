@@ -41,6 +41,10 @@ export const onRequestPost = async ({ request, env }) => {
 
     try {
       const hash = await sha256Hex(env.INVITE_SALT + code);
+      
+      // 调试信息（生产环境可以移除）
+      console.log('添加邀请码:', { code, hash: hash.substring(0, 16) + '...' });
+      
       const existing = await env.INVITE_CODES.get(hash, "json");
       
       if (existing) {
@@ -48,16 +52,23 @@ export const onRequestPost = async ({ request, env }) => {
         continue;
       }
 
-      await env.INVITE_CODES.put(
-        hash,
-        JSON.stringify({ 
-          used: false, 
-          usedCount: 0, 
-          batch, 
-          createdAt: new Date().toISOString(),
-          lastUsedAt: null
-        })
-      );
+      const record = { 
+        used: false, 
+        usedCount: 0, 
+        batch, 
+        createdAt: new Date().toISOString(),
+        lastUsedAt: null
+      };
+      
+      await env.INVITE_CODES.put(hash, JSON.stringify(record));
+      
+      // 验证写入是否成功
+      const verify = await env.INVITE_CODES.get(hash, "json");
+      if (!verify) {
+        results.push({ code, ok: false, message: "failed to save to KV" });
+        continue;
+      }
+      
       results.push({ code, ok: true });
     } catch (error) {
       results.push({ code, ok: false, message: error.message });

@@ -270,7 +270,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const failedCodes = data.results.filter(r => !r.ok);
 
                 if (successCodes.length > 0) {
-                    // 添加到本地存储
+                    // 添加到本地存储（确保立即保存）
                     const newCodes = successCodes.map(code => ({
                         code: code,
                         deviceId: null,
@@ -279,8 +279,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         lastUsedAt: null
                     }));
                     
+                    // 先加载现有列表，避免覆盖
+                    loadInviteCodes();
                     allInviteCodes.push(...newCodes);
                     saveInviteCodes();
+                    
+                    // 确保保存成功
+                    console.log('邀请码已保存到本地存储:', newCodes);
 
                     // 显示生成的邀请码
                     adminNewCodes.textContent = successCodes.join('\n');

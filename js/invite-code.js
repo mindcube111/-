@@ -200,15 +200,23 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             console.error('验证邀请码时出错:', error);
             // API 失败时，回退到本地验证（开发环境）
-            const localResult = validateInviteCode(code);
-            if (localResult.success) {
-                Storage.setCurrentInviteCode(code);
-                if (errorMsg) errorMsg.textContent = '';
-                if (successMsg) successMsg.style.display = 'block';
-                inviteCodeInput.value = '';
-                startTest();
+            // 但首先检查是否是网络错误，如果是，提示用户检查网络
+            if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                showError('网络错误，请检查网络连接后重试');
             } else {
-                showError('验证失败：' + (error.message || localResult.message));
+                const localResult = validateInviteCode(code);
+                if (localResult.success) {
+                    Storage.setCurrentInviteCode(code);
+                    if (errorMsg) errorMsg.textContent = '';
+                    if (successMsg) successMsg.style.display = 'block';
+                    inviteCodeInput.value = '';
+                    startTest();
+                } else {
+                    // 如果本地验证也失败，说明邀请码确实不存在
+                    // 可能是刚生成的邀请码还没有同步到本地存储
+                    // 提示用户稍后重试或检查邀请码是否正确
+                    showError('邀请码验证失败：' + (error.message || localResult.message) + '。如果这是刚生成的邀请码，请稍等片刻后重试。');
+                }
             }
         } finally {
             // 恢复按钮状态
@@ -267,8 +275,25 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     function validateInviteCode(code) {
         try {
+            // 确保 Storage 对象已加载
+            if (typeof Storage === 'undefined') {
+                return {
+                    success: false,
+                    message: '系统错误：Storage 未定义'
+                };
+            }
+            
             const inviteCodes = Storage.getInviteCodes();
             const deviceId = DeviceManager.getDeviceId();
+            
+            // 调试信息
+            if (typeof Logger !== 'undefined') {
+                Logger.log('本地验证邀请码:', {
+                    code: code,
+                    inviteCodesCount: inviteCodes ? inviteCodes.length : 0,
+                    deviceId: deviceId
+                });
+            }
 
             // 确保 inviteCodes 是数组
             if (!Array.isArray(inviteCodes)) {

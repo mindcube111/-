@@ -22,8 +22,13 @@ export const onRequestPost = async ({ request, env }) => {
   }
 
   const hash = await sha256Hex(env.INVITE_SALT + code);
+  
+  // 调试信息（生产环境可以移除）
+  console.log('验证邀请码:', { code, hash: hash.substring(0, 16) + '...' });
+  
   const record = await env.INVITE_CODES.get(hash, "json");
   if (!record) {
+    console.log('邀请码不存在:', { code, hash: hash.substring(0, 16) + '...' });
     return Response.json({ ok: false, message: "invalid" }, { status: 404 });
   }
 
