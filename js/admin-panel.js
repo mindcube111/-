@@ -36,6 +36,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentPage = 1;
     const itemsPerPage = 20;
     let allInviteCodes = []; // 存储所有邀请码
+    let autoRefreshInterval = null; // 自动刷新定时器
 
     // 初始化
     init();
@@ -853,7 +854,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // 自动刷新（每30秒）
-    let autoRefreshInterval = null;
     function startAutoRefresh() {
         if (autoRefreshInterval) clearInterval(autoRefreshInterval);
         autoRefreshInterval = setInterval(() => {
