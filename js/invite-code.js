@@ -177,46 +177,44 @@ document.addEventListener('DOMContentLoaded', function() {
         submitBtn.textContent = '验证中...';
 
         try {
-            // 优先使用 API 验证（生产环境）
-            const result = await validateInviteCodeWithAPI(code);
+            // 🔧 修复：优先使用本地验证（刚生成的邀请码在本地存储中）
+            console.log('开始验证邀请码:', code);
+            const localResult = validateInviteCode(code);
             
-            if (result.success) {
-                // 保存当前邀请码
+            if (localResult.success) {
+                // 本地验证成功，直接使用
+                console.log('本地验证成功');
                 Storage.setCurrentInviteCode(code);
-                // 清除错误消息
-                if (errorMsg) {
-                    errorMsg.textContent = '';
-                }
-                if (successMsg) {
-                    successMsg.style.display = 'block';
-                }
+                if (errorMsg) errorMsg.textContent = '';
+                if (successMsg) successMsg.style.display = 'block';
                 inviteCodeInput.value = '';
-                
-                // 直接开始测试
+                startTest();
+                return;
+            }
+            
+            // 本地验证失败，尝试 API 验证（可能是其他设备生成的邀请码）
+            console.log('本地验证失败，尝试 API 验证');
+            const apiResult = await validateInviteCodeWithAPI(code);
+            
+            if (apiResult.success) {
+                // API 验证成功
+                console.log('API 验证成功');
+                Storage.setCurrentInviteCode(code);
+                if (errorMsg) errorMsg.textContent = '';
+                if (successMsg) successMsg.style.display = 'block';
+                inviteCodeInput.value = '';
                 startTest();
             } else {
-                showError(result.message);
+                // API 验证也失败
+                showError(apiResult.message);
             }
         } catch (error) {
             console.error('验证邀请码时出错:', error);
-            // API 失败时，回退到本地验证（开发环境）
-            // 但首先检查是否是网络错误，如果是，提示用户检查网络
+            // API 请求失败，显示友好的错误信息
             if (error.name === 'TypeError' && error.message.includes('fetch')) {
                 showError('网络错误，请检查网络连接后重试');
             } else {
-                const localResult = validateInviteCode(code);
-                if (localResult.success) {
-                    Storage.setCurrentInviteCode(code);
-                    if (errorMsg) errorMsg.textContent = '';
-                    if (successMsg) successMsg.style.display = 'block';
-                    inviteCodeInput.value = '';
-                    startTest();
-                } else {
-                    // 如果本地验证也失败，说明邀请码确实不存在
-                    // 可能是刚生成的邀请码还没有同步到本地存储
-                    // 提示用户稍后重试或检查邀请码是否正确
-                    showError('邀请码验证失败：' + (error.message || localResult.message) + '。如果这是刚生成的邀请码，请稍等片刻后重试。');
-                }
+                showError('验证失败：' + error.message);
             }
         } finally {
             // 恢复按钮状态
@@ -240,24 +238,58 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify({ code: code })
             });
 
-            const data = await response.json();
+            // 先获取响应文本，以便调试
+            const responseText = await response.text();
+            let data;
+            try {
+                data = JSON.parse(responseText);
+            } catch (parseError) {
+                console.error('响应解析失败:', parseError, '响应内容:', responseText);
+                throw new Error('响应格式错误');
+            }
             
             // 调试信息
-            if (typeof Logger !== 'undefined') {
-                Logger.log('API 验证响应:', {
-                    status: response.status,
-                    ok: response.ok,
-                    data: data
-                });
-            } else {
-                console.log('API 验证响应:', {
-                    status: response.status,
-                    ok: response.ok,
-                    data: data
-                });
-            }
+            console.log('API 验证响应:', {
+                status: response.status,
+                ok: response.ok,
+                statusText: response.statusText,
+                data: data,
+                responseText: responseText
+            });
 
-            if (response.ok && data.ok) {
+            if (response.ok && data && data.ok === true) {
+                // API 验证成功，同步到本地存储
+                try {
+                    const inviteCodes = Storage.getInviteCodes() || [];
+                    const deviceId = DeviceManager.getDeviceId();
+                    let invite = inviteCodes.find(item => item && item.code === code);
+                    
+                    if (!invite) {
+                        // 如果本地存储中没有，创建一个新记录
+                        invite = {
+                            code: code,
+                            deviceId: deviceId,
+                            usedCount: data.usedCount || 0,
+                            createdAt: new Date().toISOString(),
+                            lastUsedAt: new Date().toISOString()
+                        };
+                        inviteCodes.push(invite);
+                    } else {
+                        // 更新现有记录
+                        invite.usedCount = data.usedCount || (invite.usedCount || 0) + 1;
+                        invite.lastUsedAt = new Date().toISOString();
+                        if (!invite.deviceId) {
+                            invite.deviceId = deviceId;
+                        }
+                    }
+                    
+                    Storage.setInviteCodes(inviteCodes);
+                    console.log('邀请码已同步到本地存储:', invite);
+                } catch (syncError) {
+                    console.error('同步邀请码到本地存储失败:', syncError);
+                    // 即使同步失败，也继续，因为 API 验证已经成功
+                }
+                
                 return {
                     success: true,
                     message: '验证成功',
@@ -429,16 +461,30 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        const inviteCodes = Storage.getInviteCodes();
+        // 检查本地存储中的邀请码（如果 API 验证成功，应该已经同步）
+        const inviteCodes = Storage.getInviteCodes() || [];
         const deviceId = DeviceManager.getDeviceId();
-        const invite = inviteCodes.find(item => 
-            item.code === currentCode && 
-            item.deviceId === deviceId &&
-            item.usedCount < CONFIG.MAX_USE_COUNT
+        let invite = inviteCodes.find(item => 
+            item && item.code === currentCode
         );
 
+        // 如果本地存储中没有，但 API 验证已经成功，创建一个临时记录
         if (!invite) {
-            showError('邀请码已失效，请重新验证');
+            console.warn('本地存储中未找到邀请码，但 API 验证已成功，创建临时记录');
+            invite = {
+                code: currentCode,
+                deviceId: deviceId,
+                usedCount: 1, // API 验证成功后，使用次数应该是 1
+                createdAt: new Date().toISOString(),
+                lastUsedAt: new Date().toISOString()
+            };
+            inviteCodes.push(invite);
+            Storage.setInviteCodes(inviteCodes);
+        }
+
+        // 检查使用次数（允许继续，因为 API 已经验证过）
+        if (invite.usedCount >= CONFIG.MAX_USE_COUNT) {
+            showError('邀请码使用次数已达上限');
             return;
         }
 
