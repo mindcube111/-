@@ -1,10 +1,12 @@
-// Cloudflare Pages Functions - 邀请码校验（哈希存储 + 一次性标记）
+// Cloudflare Pages Functions - 邀请码校验（哈希存储 + 使用次数限制）
 
 async function sha256Hex(text) {
   const data = new TextEncoder().encode(text);
   const hash = await crypto.subtle.digest("SHA-256", data);
   return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
+
+const MAX_USE_COUNT = 3; // 每个邀请码最多使用次数
 
 export const onRequestPost = async ({ request, env }) => {
   if (!env.INVITE_CODES || !env.INVITE_SALT) {
@@ -25,11 +27,23 @@ export const onRequestPost = async ({ request, env }) => {
     return Response.json({ ok: false, message: "invalid" }, { status: 404 });
   }
 
-  if (record.used) {
+  // 兼容旧格式（used: true）和新格式（usedCount: number）
+  const usedCount = record.usedCount !== undefined ? record.usedCount : (record.used ? MAX_USE_COUNT : 0);
+
+  if (usedCount >= MAX_USE_COUNT) {
     return Response.json({ ok: false, message: "used" }, { status: 410 });
   }
 
-  await env.INVITE_CODES.put(hash, JSON.stringify({ ...record, used: true }));
-  return Response.json({ ok: true });
+  // 更新使用次数
+  const updatedRecord = {
+    ...record,
+    usedCount: usedCount + 1,
+    lastUsedAt: new Date().toISOString(),
+    // 保留旧字段以兼容
+    used: usedCount + 1 >= MAX_USE_COUNT
+  };
+
+  await env.INVITE_CODES.put(hash, JSON.stringify(updatedRecord));
+  return Response.json({ ok: true, usedCount: updatedRecord.usedCount, remaining: MAX_USE_COUNT - updatedRecord.usedCount });
 };
 

@@ -50,7 +50,13 @@ export const onRequestPost = async ({ request, env }) => {
 
       await env.INVITE_CODES.put(
         hash,
-        JSON.stringify({ used: false, batch, createdAt: new Date().toISOString() })
+        JSON.stringify({ 
+          used: false, 
+          usedCount: 0, 
+          batch, 
+          createdAt: new Date().toISOString(),
+          lastUsedAt: null
+        })
       );
       results.push({ code, ok: true });
     } catch (error) {

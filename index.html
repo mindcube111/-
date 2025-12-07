@@ -226,7 +226,13 @@
     <div id="admin-panel-overlay" class="admin-panel-overlay">
       <div class="admin-panel">
         <div class="admin-panel-header">
-          <h2 class="admin-panel-title">管理员后台</h2>
+          <div class="admin-header-content">
+            <h2 class="admin-panel-title">邀请码管理系统</h2>
+            <div class="admin-header-actions">
+              <button class="admin-btn admin-btn-secondary" id="admin-settings-btn">设置</button>
+              <button class="admin-btn admin-btn-secondary" id="admin-logout-btn-header">退出登录</button>
+            </div>
+          </div>
           <button class="admin-panel-close" id="admin-panel-close">&times;</button>
         </div>
         <div class="admin-panel-content">
@@ -249,40 +255,66 @@
             <!-- 统计信息 -->
             <div class="admin-stats">
               <div class="admin-stat-item">
-                <div class="admin-stat-label">总邀请码</div>
+                <div class="admin-stat-label">总邀请码数</div>
                 <div class="admin-stat-value" id="admin-total-codes">0</div>
               </div>
               <div class="admin-stat-item">
-                <div class="admin-stat-label">已使用</div>
+                <div class="admin-stat-label">已使用次数</div>
                 <div class="admin-stat-value" id="admin-used-codes">0</div>
               </div>
               <div class="admin-stat-item">
-                <div class="admin-stat-label">剩余</div>
+                <div class="admin-stat-label">剩余次数</div>
                 <div class="admin-stat-value" id="admin-remaining-codes">0</div>
               </div>
             </div>
             
             <!-- 生成邀请码 -->
             <div class="admin-generate-section">
-              <h3>生成邀请码</h3>
+              <h3 class="admin-section-title">生成邀请码</h3>
               <div class="admin-generate-actions">
                 <button class="admin-btn" id="admin-generate-single">生成单个</button>
-                <input 
-                  type="number" 
-                  id="admin-batch-count" 
-                  placeholder="数量" 
-                  min="1" 
-                  max="100" 
-                  value="10"
-                />
-                <button class="admin-btn" id="admin-generate-batch">批量生成</button>
+                <div class="admin-batch-generate">
+                  <input 
+                    type="number" 
+                    id="admin-batch-count" 
+                    class="admin-input-small"
+                    placeholder="数量" 
+                    min="1" 
+                    max="2000" 
+                    value="10"
+                  />
+                  <button class="admin-btn" id="admin-generate-batch">批量生成</button>
+                </div>
               </div>
               <div id="admin-new-codes" class="admin-new-codes" style="display: none;"></div>
               <div id="admin-generate-message" class="admin-message" style="display: none;"></div>
             </div>
             
-            <div style="text-align: right; margin-top: 20px;">
-              <button class="admin-btn" id="admin-logout-btn">退出登录</button>
+            <!-- 复制操作 -->
+            <div class="admin-copy-section">
+              <button class="admin-btn admin-btn-secondary" id="admin-copy-all-btn">复制所有邀请码</button>
+              <button class="admin-btn admin-btn-secondary" id="admin-copy-unused-btn">复制未使用邀请码</button>
+            </div>
+            
+            <!-- 邀请码列表 -->
+            <div class="admin-codes-section">
+              <div class="admin-codes-header">
+                <h3 class="admin-section-title">邀请码列表</h3>
+                <div class="admin-filter-buttons">
+                  <button class="admin-filter-btn active" data-filter="all">全部</button>
+                  <button class="admin-filter-btn" data-filter="unused">未使用</button>
+                  <button class="admin-filter-btn" data-filter="partial">使用中</button>
+                  <button class="admin-filter-btn" data-filter="used">已用完</button>
+                </div>
+              </div>
+              <div class="admin-codes-list" id="admin-codes-list">
+                <!-- 邀请码列表由 JS 动态生成 -->
+              </div>
+              <div class="admin-pagination" id="admin-pagination" style="display: none;">
+                <button class="admin-pagination-btn" id="admin-prev-page">上一页</button>
+                <span class="admin-pagination-info" id="admin-pagination-info">第 1 页 / 共 1 页</span>
+                <button class="admin-pagination-btn" id="admin-next-page">下一页</button>
+              </div>
             </div>
           </div>
         </div>

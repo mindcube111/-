@@ -17,9 +17,23 @@ document.addEventListener('DOMContentLoaded', function() {
     const adminTotalCodes = document.getElementById('admin-total-codes');
     const adminUsedCodes = document.getElementById('admin-used-codes');
     const adminRemainingCodes = document.getElementById('admin-remaining-codes');
+    const adminCopyAllBtn = document.getElementById('admin-copy-all-btn');
+    const adminCopyUnusedBtn = document.getElementById('admin-copy-unused-btn');
+    const adminCodesList = document.getElementById('admin-codes-list');
+    const adminFilterButtons = document.querySelectorAll('.admin-filter-btn');
+    const adminPagination = document.getElementById('admin-pagination');
+    const adminPrevPage = document.getElementById('admin-prev-page');
+    const adminNextPage = document.getElementById('admin-next-page');
+    const adminPaginationInfo = document.getElementById('admin-pagination-info');
+    const adminLogoutBtnHeader = document.getElementById('admin-logout-btn-header');
+    const adminSettingsBtn = document.getElementById('admin-settings-btn');
 
     let adminToken = sessionStorage.getItem('admin_token');
     let isLoggedIn = !!adminToken;
+    let currentFilter = 'all';
+    let currentPage = 1;
+    const itemsPerPage = 20;
+    let allInviteCodes = []; // 存储所有邀请码
 
     // 初始化
     init();
@@ -64,11 +78,60 @@ document.addEventListener('DOMContentLoaded', function() {
         if (adminGenerateBatch) {
             adminGenerateBatch.addEventListener('click', () => {
                 const count = parseInt(adminBatchCount.value) || 10;
-                if (count < 1 || count > 100) {
-                    showMessage(adminGenerateMessage, '请输入1-100之间的数字', 'error');
+                if (count < 1 || count > 2000) {
+                    showMessage(adminGenerateMessage, '请输入1-2000之间的数字', 'error');
                     return;
                 }
                 generateInviteCodes(count);
+            });
+        }
+
+        if (adminCopyAllBtn) {
+            adminCopyAllBtn.addEventListener('click', copyAllCodes);
+        }
+
+        if (adminCopyUnusedBtn) {
+            adminCopyUnusedBtn.addEventListener('click', copyUnusedCodes);
+        }
+
+        if (adminFilterButtons) {
+            adminFilterButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    adminFilterButtons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    currentFilter = btn.dataset.filter;
+                    currentPage = 1;
+                    renderCodesList();
+                });
+            });
+        }
+
+        if (adminPrevPage) {
+            adminPrevPage.addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    renderCodesList();
+                }
+            });
+        }
+
+        if (adminNextPage) {
+            adminNextPage.addEventListener('click', () => {
+                const totalPages = Math.ceil(getFilteredCodes().length / itemsPerPage);
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    renderCodesList();
+                }
+            });
+        }
+
+        if (adminLogoutBtnHeader) {
+            adminLogoutBtnHeader.addEventListener('click', handleLogout);
+        }
+
+        if (adminSettingsBtn) {
+            adminSettingsBtn.addEventListener('click', () => {
+                alert('设置功能开发中...');
             });
         }
     }
@@ -143,7 +206,9 @@ document.addEventListener('DOMContentLoaded', function() {
     function showAdminFunctions() {
         if (adminLoginSection) adminLoginSection.style.display = 'none';
         if (adminFunctions) adminFunctions.classList.add('show');
+        loadInviteCodes();
         updateStats();
+        renderCodesList();
     }
 
     function showMessage(element, message, type) {
@@ -205,6 +270,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 const failedCodes = data.results.filter(r => !r.ok);
 
                 if (successCodes.length > 0) {
+                    // 添加到本地存储
+                    const newCodes = successCodes.map(code => ({
+                        code: code,
+                        deviceId: null,
+                        usedCount: 0,
+                        createdAt: new Date().toISOString(),
+                        lastUsedAt: null
+                    }));
+                    
+                    allInviteCodes.push(...newCodes);
+                    saveInviteCodes();
+
                     // 显示生成的邀请码
                     adminNewCodes.textContent = successCodes.join('\n');
                     adminNewCodes.style.display = 'block';
@@ -223,8 +300,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     showMessage(adminGenerateMessage, '生成失败：' + (failedCodes[0]?.message || '未知错误'), 'error');
                 }
 
-                // 更新统计信息
+                // 更新统计信息和列表
                 updateStats();
+                renderCodesList();
             } else {
                 showMessage(adminGenerateMessage, '生成失败：' + (data.message || '未知错误'), 'error');
             }
@@ -239,18 +317,247 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     /**
-     * 更新统计信息（从 KV 获取，这里简化处理）
+     * 从本地存储加载邀请码列表
      */
-    async function updateStats() {
-        // 注意：由于 KV 的限制，我们无法直接获取所有键
-        // 这里显示占位数据，实际项目中可能需要维护一个计数器
-        if (adminTotalCodes) adminTotalCodes.textContent = '-';
-        if (adminUsedCodes) adminUsedCodes.textContent = '-';
-        if (adminRemainingCodes) adminRemainingCodes.textContent = '-';
+    function loadInviteCodes() {
+        try {
+            // 从 localStorage 加载（与 admin.js 兼容）
+            if (typeof Storage !== 'undefined' && Storage.getInviteCodes) {
+                allInviteCodes = Storage.getInviteCodes() || [];
+            } else {
+                // 备用方法
+                const stored = localStorage.getItem('invite_codes');
+                allInviteCodes = stored ? JSON.parse(stored) : [];
+            }
+        } catch (error) {
+            console.error('加载邀请码列表失败:', error);
+            allInviteCodes = [];
+        }
+    }
+
+    /**
+     * 保存邀请码列表到本地存储
+     */
+    function saveInviteCodes() {
+        try {
+            if (typeof Storage !== 'undefined' && Storage.setInviteCodes) {
+                Storage.setInviteCodes(allInviteCodes);
+            } else {
+                localStorage.setItem('invite_codes', JSON.stringify(allInviteCodes));
+            }
+        } catch (error) {
+            console.error('保存邀请码列表失败:', error);
+        }
+    }
+
+    /**
+     * 获取筛选后的邀请码
+     */
+    function getFilteredCodes() {
+        let filtered = [...allInviteCodes];
         
-        // 实际项目中，可以：
-        // 1. 维护一个统计键在 KV 中
-        // 2. 或者通过其他方式获取统计信息
+        if (currentFilter === 'unused') {
+            filtered = filtered.filter(code => (code.usedCount || 0) === 0);
+        } else if (currentFilter === 'partial') {
+            filtered = filtered.filter(code => {
+                const used = code.usedCount || 0;
+                return used > 0 && used < 3;
+            });
+        } else if (currentFilter === 'used') {
+            filtered = filtered.filter(code => (code.usedCount || 0) >= 3);
+        }
+        
+        // 按创建时间倒序
+        filtered.sort((a, b) => {
+            const dateA = a.createdAt ? new Date(a.createdAt) : new Date(0);
+            const dateB = b.createdAt ? new Date(b.createdAt) : new Date(0);
+            return dateB.getTime() - dateA.getTime();
+        });
+        
+        return filtered;
+    }
+
+    /**
+     * 渲染邀请码列表
+     */
+    function renderCodesList() {
+        if (!adminCodesList) return;
+        
+        const filteredCodes = getFilteredCodes();
+        
+        if (filteredCodes.length === 0) {
+            adminCodesList.innerHTML = '<div class="admin-empty-message">暂无邀请码，点击上方按钮生成</div>';
+            if (adminPagination) adminPagination.style.display = 'none';
+            return;
+        }
+
+        // 分页
+        const totalPages = Math.ceil(filteredCodes.length / itemsPerPage);
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        const pageCodes = filteredCodes.slice(startIndex, endIndex);
+
+        // 显示/隐藏分页
+        if (adminPagination) {
+            adminPagination.style.display = totalPages > 1 ? 'flex' : 'none';
+        }
+
+        // 更新分页信息
+        if (adminPaginationInfo) {
+            adminPaginationInfo.textContent = `第 ${currentPage} 页 / 共 ${totalPages} 页 (共 ${filteredCodes.length} 条)`;
+        }
+
+        // 更新分页按钮状态
+        if (adminPrevPage) {
+            adminPrevPage.disabled = currentPage === 1;
+        }
+        if (adminNextPage) {
+            adminNextPage.disabled = currentPage >= totalPages;
+        }
+
+        // 渲染列表
+        let html = '';
+        pageCodes.forEach(code => {
+            const usedCount = code.usedCount || 0;
+            let statusClass = 'unused';
+            let statusText = '未使用';
+            
+            if (usedCount >= 3) {
+                statusClass = 'used';
+                statusText = '已用完';
+            } else if (usedCount > 0) {
+                statusClass = 'partial';
+                statusText = `已使用 ${usedCount}/3`;
+            }
+
+            const createdAt = code.createdAt ? formatDate(code.createdAt) : '未知';
+            const lastUsedAt = code.lastUsedAt ? formatDate(code.lastUsedAt) : null;
+
+            html += `
+                <div class="admin-code-item">
+                    <div class="admin-code-header">
+                        <div class="admin-code-text">${code.code}</div>
+                        <div class="admin-code-status ${statusClass}">${statusText}</div>
+                    </div>
+                    <div class="admin-code-info">
+                        <div class="admin-code-info-item">
+                            <span class="admin-code-info-label">创建时间：</span>
+                            <span class="admin-code-info-value">${createdAt}</span>
+                        </div>
+                        <div class="admin-code-info-item">
+                            <span class="admin-code-info-label">使用次数：</span>
+                            <span class="admin-code-info-value">${usedCount}/3</span>
+                        </div>
+                        ${lastUsedAt ? `
+                        <div class="admin-code-info-item">
+                            <span class="admin-code-info-label">最后使用：</span>
+                            <span class="admin-code-info-value">${lastUsedAt}</span>
+                        </div>
+                        ` : ''}
+                    </div>
+                    <div class="admin-code-actions">
+                        <button class="admin-code-action-btn" onclick="copyCode('${code.code}')">复制</button>
+                        <button class="admin-code-action-btn delete" onclick="deleteCode('${code.code}')">删除</button>
+                    </div>
+                </div>
+            `;
+        });
+
+        adminCodesList.innerHTML = html;
+    }
+
+    /**
+     * 格式化日期
+     */
+    function formatDate(dateString) {
+        if (!dateString) return '未知';
+        try {
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return '无效日期';
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            return `${month}-${day} ${hours}:${minutes}`;
+        } catch (error) {
+            return '无效日期';
+        }
+    }
+
+    /**
+     * 复制单个邀请码
+     */
+    window.copyCode = function(code) {
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(code).then(() => {
+                showMessage(adminGenerateMessage, `邀请码 ${code} 已复制`, 'success');
+            });
+        }
+    };
+
+    /**
+     * 删除邀请码
+     */
+    window.deleteCode = function(code) {
+        if (confirm(`确定要删除邀请码 ${code} 吗？此操作不可恢复。`)) {
+            allInviteCodes = allInviteCodes.filter(c => c.code !== code);
+            saveInviteCodes();
+            updateStats();
+            renderCodesList();
+            showMessage(adminGenerateMessage, '邀请码已删除', 'success');
+        }
+    };
+
+    /**
+     * 复制所有邀请码
+     */
+    function copyAllCodes() {
+        if (allInviteCodes.length === 0) {
+            showMessage(adminGenerateMessage, '没有邀请码可复制', 'error');
+            return;
+        }
+        const codes = allInviteCodes.map(c => c.code).join('\n');
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(codes).then(() => {
+                showMessage(adminGenerateMessage, '所有邀请码已复制到剪贴板', 'success');
+            });
+        }
+    }
+
+    /**
+     * 复制未使用邀请码
+     */
+    function copyUnusedCodes() {
+        const unusedCodes = allInviteCodes
+            .filter(c => (c.usedCount || 0) === 0)
+            .map(c => c.code);
+        
+        if (unusedCodes.length === 0) {
+            showMessage(adminGenerateMessage, '没有未使用的邀请码', 'error');
+            return;
+        }
+        
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(unusedCodes.join('\n')).then(() => {
+                showMessage(adminGenerateMessage, '未使用邀请码已复制到剪贴板', 'success');
+            });
+        }
+    }
+
+    /**
+     * 更新统计信息
+     */
+    function updateStats() {
+        const total = allInviteCodes.length;
+        const used = allInviteCodes.reduce((sum, code) => sum + (code.usedCount || 0), 0);
+        const remaining = allInviteCodes.reduce((sum, code) => {
+            const usedCount = code.usedCount || 0;
+            return sum + Math.max(0, 3 - usedCount);
+        }, 0);
+
+        if (adminTotalCodes) adminTotalCodes.textContent = total;
+        if (adminUsedCodes) adminUsedCodes.textContent = used;
+        if (adminRemainingCodes) adminRemainingCodes.textContent = remaining;
     }
 
     // 暴露给全局，方便调试
