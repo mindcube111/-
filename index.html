@@ -8,9 +8,15 @@
     />
     <title>《怪奇物语》性格测试</title>
     <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="css/admin-panel.css" />
   </head>
   <body>
     <div class="app-root">
+      <!-- 管理员入口按钮（右上角） -->
+      <button id="admin-toggle-btn" class="admin-toggle-btn" title="管理员后台">
+        ⚙️
+      </button>
+      
       <main class="app-main">
         <!-- 开始页面 -->
         <section class="card card-intro" id="intro-section">
@@ -216,10 +222,78 @@
       </footer>
     </div>
 
+    <!-- 管理员面板 -->
+    <div id="admin-panel-overlay" class="admin-panel-overlay">
+      <div class="admin-panel">
+        <div class="admin-panel-header">
+          <h2 class="admin-panel-title">管理员后台</h2>
+          <button class="admin-panel-close" id="admin-panel-close">&times;</button>
+        </div>
+        <div class="admin-panel-content">
+          <!-- 登录表单 -->
+          <div id="admin-login-section">
+            <form class="admin-login-form" id="admin-login-form">
+              <input 
+                type="password" 
+                id="admin-password-input" 
+                placeholder="请输入管理员密码"
+                autocomplete="off"
+              />
+              <button type="submit" class="admin-btn admin-btn-primary">登录</button>
+              <div id="admin-login-message" class="admin-message" style="display: none;"></div>
+            </form>
+          </div>
+          
+          <!-- 管理员功能区域 -->
+          <div id="admin-functions" class="admin-functions">
+            <!-- 统计信息 -->
+            <div class="admin-stats">
+              <div class="admin-stat-item">
+                <div class="admin-stat-label">总邀请码</div>
+                <div class="admin-stat-value" id="admin-total-codes">0</div>
+              </div>
+              <div class="admin-stat-item">
+                <div class="admin-stat-label">已使用</div>
+                <div class="admin-stat-value" id="admin-used-codes">0</div>
+              </div>
+              <div class="admin-stat-item">
+                <div class="admin-stat-label">剩余</div>
+                <div class="admin-stat-value" id="admin-remaining-codes">0</div>
+              </div>
+            </div>
+            
+            <!-- 生成邀请码 -->
+            <div class="admin-generate-section">
+              <h3>生成邀请码</h3>
+              <div class="admin-generate-actions">
+                <button class="admin-btn" id="admin-generate-single">生成单个</button>
+                <input 
+                  type="number" 
+                  id="admin-batch-count" 
+                  placeholder="数量" 
+                  min="1" 
+                  max="100" 
+                  value="10"
+                />
+                <button class="admin-btn" id="admin-generate-batch">批量生成</button>
+              </div>
+              <div id="admin-new-codes" class="admin-new-codes" style="display: none;"></div>
+              <div id="admin-generate-message" class="admin-message" style="display: none;"></div>
+            </div>
+            
+            <div style="text-align: right; margin-top: 20px;">
+              <button class="admin-btn" id="admin-logout-btn">退出登录</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script src="js/config.js"></script>
     <script src="js/storage.js"></script>
     <script src="js/device.js"></script>
     <script src="js/invite-code.js"></script>
+    <script src="js/admin-panel.js"></script>
     <script src="script.js"></script>
   </body>
 </html>

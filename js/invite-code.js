@@ -158,7 +158,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // 提交验证
-    submitBtn.addEventListener('click', function() {
+    submitBtn.addEventListener('click', async function() {
         const code = inviteCodeInput.value.trim();
         
         if (!code) {
@@ -171,27 +171,97 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // 验证邀请码
-        const result = validateInviteCode(code);
-        
-        if (result.success) {
-            // 保存当前邀请码
-            Storage.setCurrentInviteCode(code);
-            // 清除错误消息
-            if (errorMsg) {
-                errorMsg.textContent = '';
-            }
-            inviteCodeInput.value = '';
+        // 禁用按钮，显示加载状态
+        submitBtn.disabled = true;
+        const originalText = submitBtn.textContent;
+        submitBtn.textContent = '验证中...';
+
+        try {
+            // 优先使用 API 验证（生产环境）
+            const result = await validateInviteCodeWithAPI(code);
             
-            // 直接开始测试
-            startTest();
-        } else {
-            showError(result.message);
+            if (result.success) {
+                // 保存当前邀请码
+                Storage.setCurrentInviteCode(code);
+                // 清除错误消息
+                if (errorMsg) {
+                    errorMsg.textContent = '';
+                }
+                if (successMsg) {
+                    successMsg.style.display = 'block';
+                }
+                inviteCodeInput.value = '';
+                
+                // 直接开始测试
+                startTest();
+            } else {
+                showError(result.message);
+            }
+        } catch (error) {
+            console.error('验证邀请码时出错:', error);
+            // API 失败时，回退到本地验证（开发环境）
+            const localResult = validateInviteCode(code);
+            if (localResult.success) {
+                Storage.setCurrentInviteCode(code);
+                if (errorMsg) errorMsg.textContent = '';
+                if (successMsg) successMsg.style.display = 'block';
+                inviteCodeInput.value = '';
+                startTest();
+            } else {
+                showError('验证失败：' + (error.message || localResult.message));
+            }
+        } finally {
+            // 恢复按钮状态
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
         }
     });
 
     /**
-     * 验证邀请码
+     * 通过 API 验证邀请码（生产环境）
+     * @param {string} code
+     * @returns {Promise<Object>}
+     */
+    async function validateInviteCodeWithAPI(code) {
+        try {
+            const response = await fetch('/api/verify-invite', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ code: code })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.ok) {
+                return {
+                    success: true,
+                    message: '验证成功'
+                };
+            } else {
+                // 根据 API 返回的错误信息提供友好的提示
+                let message = '邀请码验证失败';
+                if (data.message === 'invalid') {
+                    message = '邀请码不存在或已失效';
+                } else if (data.message === 'used') {
+                    message = '此邀请码已被使用';
+                } else if (data.message) {
+                    message = data.message;
+                }
+                return {
+                    success: false,
+                    message: message
+                };
+            }
+        } catch (error) {
+            // 网络错误或其他错误，抛出异常以便回退到本地验证
+            throw error;
+        }
+    }
+
+    /**
+     * 验证邀请码（本地验证，用于开发环境或 API 失败时的回退）
      * @param {string} code
      * @returns {Object}
      */
